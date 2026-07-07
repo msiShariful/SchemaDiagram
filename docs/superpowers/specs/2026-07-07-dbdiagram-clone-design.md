@@ -39,7 +39,7 @@ target); fully hand-rolled parser + SQL converters (double scope, correctness ri
 
 | Area | Features |
 |---|---|
-| DBML | Full spec via `@dbml/core`: tables, column settings (pk, unique, not null, increment, default), refs (1-1, 1-n, n-n, composite, `on delete`/`on update`), enums, indexes, notes, TableGroups, header colors, multi-schema, sticky notes |
+| DBML | Full spec via `@dbml/core`: tables, column settings (pk, unique, not null, increment, default), refs (1-1, 1-n, n-n, composite, `on delete`/`on update`), enums, indexes, notes, TableGroups, header colors, multi-schema, sticky notes (standalone `Note` blocks defined in DBML, positioned freely on canvas via the layout slice) |
 | Editor | Syntax highlighting, schema-aware autocomplete (table/column/type/setting names, block snippets), inline error squiggles with line/col + problems panel, format document, find/replace, two-way editor↔canvas navigation |
 | Canvas | Field-anchored orthogonal edges with crow's-foot/`1`/`*` markers, drag with snap-to-grid + alignment guides, marquee multi-select, minimap, zoom-to-fit / zoom controls, ELK auto-layout button, table group containers (drag as unit), sticky notes, hover/select highlighting of related edges and tables |
 | Import | SQL DDL: PostgreSQL, MySQL, SQL Server; open/paste `.dbml`. Import always creates a new diagram — never overwrites the current one |
