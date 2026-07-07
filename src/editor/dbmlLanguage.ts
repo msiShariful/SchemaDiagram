@@ -29,14 +29,18 @@ export const dbmlTokenizer: StreamParser<DbmlState> = {
       return 'string';
     }
     if (stream.eatSpace()) return null;
-    if (stream.match('//')) { stream.skipToEnd(); return 'comment'; }
-    if (stream.match('/*')) { state.inBlockComment = true; return 'comment'; }
-    if (stream.match("'''")) { state.inTripleString = true; return 'string'; }
-    if (stream.match(/^'(?:[^'\\]|\\.)*'/) || stream.match(/^"(?:[^"\\]|\\.)*"/)) return 'string';
-    if (stream.match(/^`[^`]*`/)) return 'string';
-    if (stream.match(/^\d+(\.\d+)?/)) return 'number';
-    if (stream.match('[')) { state.inSettings = true; return 'bracket'; }
-    if (stream.match(']')) { state.inSettings = false; return 'bracket'; }
+    // Every branch below that consumes a non-identifier token clears
+    // afterBlockKeyword; only the def branch consumes it meaningfully.
+    // Otherwise the flag leaks (e.g. across lines after `note: 'x'`) and
+    // falsely tags a later bare word as a definition.
+    if (stream.match('//')) { state.afterBlockKeyword = false; stream.skipToEnd(); return 'comment'; }
+    if (stream.match('/*')) { state.afterBlockKeyword = false; state.inBlockComment = true; return 'comment'; }
+    if (stream.match("'''")) { state.afterBlockKeyword = false; state.inTripleString = true; return 'string'; }
+    if (stream.match(/^'(?:[^'\\]|\\.)*'/) || stream.match(/^"(?:[^"\\]|\\.)*"/)) { state.afterBlockKeyword = false; return 'string'; }
+    if (stream.match(/^`[^`]*`/)) { state.afterBlockKeyword = false; return 'string'; }
+    if (stream.match(/^\d+(\.\d+)?/)) { state.afterBlockKeyword = false; return 'number'; }
+    if (stream.match('[')) { state.afterBlockKeyword = false; state.inSettings = true; return 'bracket'; }
+    if (stream.match(']')) { state.afterBlockKeyword = false; state.inSettings = false; return 'bracket'; }
     if (state.afterBlockKeyword && stream.match(/^[\w.]+/)) {
       state.afterBlockKeyword = false;
       return 'def';
@@ -49,6 +53,7 @@ export const dbmlTokenizer: StreamParser<DbmlState> = {
     if (state.inSettings && stream.match(/^[\w]+/)) return 'attribute';
     if (stream.match(/^[\w]+/)) return null;
     stream.next();
+    state.afterBlockKeyword = false;
     return null;
   },
 };

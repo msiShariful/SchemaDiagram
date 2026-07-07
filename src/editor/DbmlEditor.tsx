@@ -33,6 +33,8 @@ export function DbmlEditor() {
         const diags = errors.map((e) => errorToDiagnostic(view.state.doc, e));
         view.dispatch(setDiagnostics(view.state, diags));
       },
+      // Seed squiggles for errors already in the store when the editor mounts.
+      { fireImmediately: true },
     );
     const unsubSource = useAppStore.subscribe(
       (s) => s.source,
