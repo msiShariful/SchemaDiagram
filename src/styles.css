@@ -24,3 +24,20 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .divider { width: 5px; cursor: col-resize; background: transparent; margin-left: -3px; z-index: 5; }
 .divider:hover { background: var(--accent); opacity: 0.4; }
 .canvas-pane { flex: 1; min-width: 0; position: relative; overflow: hidden; background: #fafbfc; }
+.diagram-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.table-node { cursor: grab; }
+.table-body { fill: #fff; stroke: var(--border); }
+.table-header { fill: var(--table-header); }
+.table-title { fill: #fff; font-size: 13px; font-weight: 600; }
+.field-name { font-size: 12px; fill: var(--text); }
+.field-name.pk { font-weight: 600; }
+.field-type { font-size: 11px; fill: var(--text-dim); }
+.row-line { stroke: var(--border); }
+.statusbar {
+  display: flex; gap: 16px; padding: 3px 12px; font-size: 12px;
+  border-top: 1px solid var(--border); background: var(--bg-panel);
+}
+.status-ok { color: #2e7d32; }
+.status-errors { color: var(--error); }
+.status-dim { color: var(--text-dim); }
+.badge.stale { font-size: 11px; color: #92600a; background: #fdf0d5; padding: 2px 8px; border-radius: 10px; }
