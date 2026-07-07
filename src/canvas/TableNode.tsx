@@ -48,6 +48,7 @@ export const TableNode = memo(function TableNode({ table, pos, zoomRef, onLiveMo
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
       onPointerEnter={() => onHover(table.id)}
       onPointerLeave={() => onHover(null)}
     >
