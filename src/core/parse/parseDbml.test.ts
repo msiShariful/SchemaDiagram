@@ -1,0 +1,80 @@
+import { describe, it, expect } from 'vitest';
+import { parseDbml } from './parseDbml';
+
+// Note: @dbml/core's grammar requires a newline before a block's closing
+// `}` (a value immediately followed by `}` on the same line is a syntax
+// error), so the enum block and the single-line table below are written
+// across multiple lines to be valid DBML. Verified directly against the
+// installed @dbml/core (9.0.0-alpha.3) parser.
+const SAMPLE = `
+Table users {
+  id integer [pk, increment]
+  username varchar [not null, unique]
+  role user_role [default: 'member']
+}
+Table posts {
+  id integer [pk]
+  user_id integer [not null, note: 'author']
+}
+Enum user_role {
+  admin
+  member
+}
+Ref: posts.user_id > users.id
+`;
+
+describe('parseDbml', () => {
+  it('normalizes tables, fields, and ids', () => {
+    const r = parseDbml(SAMPLE);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(r.schema.tables.map((t) => t.id).sort()).toEqual(['public.posts', 'public.users']);
+    const users = r.schema.tables.find((t) => t.id === 'public.users')!;
+    expect(users.fields.map((f) => f.name)).toEqual(['id', 'username', 'role']);
+    expect(users.fields[0]).toMatchObject({ pk: true, increment: true });
+    expect(users.fields[1]).toMatchObject({ notNull: true, unique: true });
+    expect(users.fields[2].isEnum).toBe(true);
+    expect(users.fields[2].defaultValue).toBe('member');
+    const posts = r.schema.tables.find((t) => t.id === 'public.posts')!;
+    expect(posts.fields[1].note).toBe('author');
+  });
+
+  it('normalizes refs with endpoints and relations', () => {
+    const r = parseDbml(SAMPLE);
+    if (!r.ok) throw new Error('expected ok');
+    expect(r.schema.refs).toHaveLength(1);
+    const ref = r.schema.refs[0];
+    const endpoints = [ref.from, ref.to];
+    const many = endpoints.find((e) => e.relation === '*')!;
+    const one = endpoints.find((e) => e.relation === '1')!;
+    expect(many.tableId).toBe('public.posts');
+    expect(many.fieldNames).toEqual(['user_id']);
+    expect(one.tableId).toBe('public.users');
+  });
+
+  it('normalizes enums', () => {
+    const r = parseDbml(SAMPLE);
+    if (!r.ok) throw new Error('expected ok');
+    expect(r.schema.enums).toEqual([{ id: 'public.user_role', name: 'user_role', values: ['admin', 'member'] }]);
+  });
+
+  it('supports multiple schemas in table ids', () => {
+    const r = parseDbml('Table shop.orders {\n  id int [pk]\n}');
+    if (!r.ok) throw new Error('expected ok');
+    expect(r.schema.tables[0].id).toBe('shop.orders');
+  });
+
+  it('returns positioned errors for invalid source', () => {
+    const r = parseDbml('Table users {\n  id integer [pk\n}');
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors.length).toBeGreaterThan(0);
+    expect(r.errors[0].line).toBeGreaterThanOrEqual(1);
+    expect(r.errors[0].message).toBeTruthy();
+  });
+
+  it('parses empty source to an empty schema', () => {
+    const r = parseDbml('');
+    if (!r.ok) throw new Error('expected ok');
+    expect(r.schema.tables).toEqual([]);
+  });
+});
