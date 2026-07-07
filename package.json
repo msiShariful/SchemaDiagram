@@ -14,7 +14,7 @@
     "@codemirror/lint": "^6.9.7",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
-    "@dbml/core": "^9.0.0-alpha.3",
+    "@dbml/core": "^8.3.1",
     "codemirror": "^6.0.2",
     "idb": "^8.0.3",
     "nanoid": "^5.1.16",

@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseDbml } from './parseDbml';
 
-// Note: @dbml/core's grammar requires a newline before a block's closing
-// `}` (a value immediately followed by `}` on the same line is a syntax
-// error), so the enum block and the single-line table below are written
-// across multiple lines to be valid DBML. Verified directly against the
-// installed @dbml/core (9.0.0-alpha.3) parser.
 const SAMPLE = `
 Table users {
   id integer [pk, increment]
@@ -16,10 +11,7 @@ Table posts {
   id integer [pk]
   user_id integer [not null, note: 'author']
 }
-Enum user_role {
-  admin
-  member
-}
+Enum user_role { admin \n member }
 Ref: posts.user_id > users.id
 `;
 
@@ -58,7 +50,7 @@ describe('parseDbml', () => {
   });
 
   it('supports multiple schemas in table ids', () => {
-    const r = parseDbml('Table shop.orders {\n  id int [pk]\n}');
+    const r = parseDbml('Table shop.orders { id int [pk] }');
     if (!r.ok) throw new Error('expected ok');
     expect(r.schema.tables[0].id).toBe('shop.orders');
   });

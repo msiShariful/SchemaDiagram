@@ -6,7 +6,9 @@ export type ParseResult = { ok: true; schema: Schema } | { ok: false; errors: Pa
 
 export function parseDbml(source: string): ParseResult {
   try {
-    const db = new Parser().parse(source, 'dbml');
+    // 'dbmlv2' is the ANTLR-based DBML parser (dbdiagram.io's current syntax);
+    // the legacy 'dbml' peg parser rejects single-line blocks like `Table a { id int }`.
+    const db = new Parser().parse(source, 'dbmlv2');
     return { ok: true, schema: normalizeDatabase(db) };
   } catch (e) {
     return { ok: false, errors: normalizeErrors(e) };
