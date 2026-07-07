@@ -5,8 +5,9 @@ import { createWorkerParse } from '../core/parse/workerParse';
 
 export function useParsePipeline(): void {
   useEffect(() => {
+    const adapter = createWorkerParse();
     const pipeline = createParsePipeline({
-      parse: createWorkerParse(),
+      parse: adapter.parse,
       onResult: (r) => useAppStore.getState().applyParse(r),
       debounceMs: 300,
     });
@@ -18,6 +19,7 @@ export function useParsePipeline(): void {
     return () => {
       unsub();
       pipeline.dispose();
+      adapter.dispose();
     };
   }, []);
 }
