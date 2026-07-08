@@ -33,4 +33,24 @@ describe('formatDbmlSource', () => {
     const strip = (s: string) => s.replace(/[ \t]+/g, '');
     expect(strip(formatDbmlSource(src))).toBe(strip(src));
   });
+  it('counts depth in the tail after a same-line block-comment closer', () => {
+    const src = 'Table t {\n  id int\n  /* note\n*/ settings {\nx\n}\n}';
+    const expected = 'Table t {\n  id int\n  /* note\n*/ settings {\n    x\n  }\n}';
+    expect(formatDbmlSource(src)).toBe(expected);
+    expect(formatDbmlSource(expected)).toBe(expected);
+  });
+  it('indents multi-line bracket settings and dedents the closing ]', () => {
+    const src = 'Table t {\nid int [\npk,\nincrement\n]\n}';
+    const expected = 'Table t {\n  id int [\n    pk,\n    increment\n  ]\n}';
+    expect(formatDbmlSource(src)).toBe(expected);
+    expect(formatDbmlSource(expected)).toBe(expected);
+  });
+  it('counts a brace after a same-line triple-quote closer', () => {
+    const src = "Table t {\n  Note: '''\nbody\n''' }\nTable u {\n  id int\n}";
+    const out = formatDbmlSource(src);
+    const lines = out.split('\n');
+    const idx = lines.indexOf('Table u {');
+    expect(idx).toBeGreaterThan(-1); // flush left, depth back to 0
+    expect(lines[idx + 1]).toBe('  id int');
+  });
 });

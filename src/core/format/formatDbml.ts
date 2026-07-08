@@ -43,6 +43,15 @@ function scrubLine(
   return out;
 }
 
+/** Apply brace/bracket depth changes from a scrubbed (string/comment-free) line. */
+function countDepth(scrubbed: string, depth: number): number {
+  for (const ch of scrubbed) {
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') depth = Math.max(0, depth - 1);
+  }
+  return depth;
+}
+
 export function formatDbmlSource(source: string): string {
   const lines = source.split('\n');
   const out: string[] = [];
@@ -52,9 +61,11 @@ export function formatDbmlSource(source: string): string {
 
   for (const raw of lines) {
     if (state.inTriple || state.inBlockComment) {
-      // verbatim passthrough; scrub only to detect the closer
-      scrubLine(raw, state);
+      // verbatim passthrough; scrub to detect the closer, and count any
+      // depth changes in the code tail after a same-line `*/` or `'''`
+      const tail = scrubLine(raw, state);
       out.push(raw);
+      depth = countDepth(tail, depth);
       continue;
     }
     const trimmed = raw.trim();
@@ -76,10 +87,7 @@ export function formatDbmlSource(source: string): string {
     }
     out.push('  '.repeat(lineDepth) + content);
 
-    for (const ch of scrubbed) {
-      if (ch === '{') depth++;
-      else if (ch === '}') depth = Math.max(0, depth - 1);
-    }
+    depth = countDepth(scrubbed, depth);
   }
   // drop a trailing blank line introduced by collapsing, keep original final-newline shape
   while (out.length > 1 && out[out.length - 1] === '' && !source.endsWith('\n')) out.pop();
