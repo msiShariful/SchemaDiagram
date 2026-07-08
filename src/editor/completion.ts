@@ -39,7 +39,8 @@ function enclosingBlock(blanked: string, pos: number): string | null {
   for (let i = 0; i < pos; i++) {
     const ch = blanked[i];
     if (ch === '{') {
-      const before = blanked.slice(Math.max(0, i - 80), i + 1).trimEnd();
+      // block openers are single-line by grammar, so scan the opener's whole line
+      const before = blanked.slice(blanked.lastIndexOf('\n', i) + 1, i + 1).trimEnd();
       const m = BLOCK_OPENER_RE.exec(before);
       stack.push(m ? m[1].toLowerCase() : '?');
     } else if (ch === '}') {
@@ -49,6 +50,9 @@ function enclosingBlock(blanked: string, pos: number): string | null {
   return stack.length ? stack[stack.length - 1] : null;
 }
 
+// column-of-table: word(.word)? '.' partial-word at cursor
+const COLUMN_DOT_RE = /(?:([A-Za-z_]\w*)\s*\.\s*)?([A-Za-z_]\w*)\.\w*$/;
+
 export function detectContext(text: string, pos: number): DbmlContext {
   const blanked = blankNoise(text);
   const lineStart = blanked.lastIndexOf('\n', pos - 1) + 1;
@@ -57,10 +61,24 @@ export function detectContext(text: string, pos: number): DbmlContext {
   // settings: unclosed '[' on this line before the cursor
   const opens = (linePrefix.match(/\[/g) ?? []).length;
   const closes = (linePrefix.match(/\]/g) ?? []).length;
-  if (opens > closes) return { kind: 'settings' };
+  if (opens > closes) {
+    // inside an in-progress inline `ref:` setting, targets beat setting keywords
+    const bracketStack: number[] = [];
+    for (let i = 0; i < linePrefix.length; i++) {
+      if (linePrefix[i] === '[') bracketStack.push(i);
+      else if (linePrefix[i] === ']') bracketStack.pop();
+    }
+    const lastOpen = bracketStack.length ? bracketStack[bracketStack.length - 1] : -1;
+    const segment = linePrefix.slice(lastOpen + 1);
+    if (/ref\s*:[^,\]]*$/i.test(segment)) {
+      const dm = COLUMN_DOT_RE.exec(segment);
+      if (dm) return { kind: 'column-of-table', tableName: dm[2], schemaName: dm[1] };
+      if (/ref\s*:\s*[<>-]?\s*[\w."]*$/i.test(segment)) return { kind: 'table-target' };
+    }
+    return { kind: 'settings' };
+  }
 
-  // column-of-table: word(.word)? '.' partial-word at cursor
-  const dotMatch = /(?:([A-Za-z_]\w*)\s*\.\s*)?([A-Za-z_]\w*)\.\w*$/.exec(linePrefix);
+  const dotMatch = COLUMN_DOT_RE.exec(linePrefix);
   if (dotMatch) {
     return { kind: 'column-of-table', tableName: dotMatch[2], schemaName: dotMatch[1] };
   }

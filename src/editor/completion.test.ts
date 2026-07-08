@@ -113,3 +113,34 @@ describe('createDbmlCompletion', () => {
     expect(labels('Table t {\n  ti|\n}', false)).toEqual([]);
   });
 });
+
+describe('inline ref completions inside settings', () => {
+  it('offers target columns after table-dot inside an inline ref', () => {
+    const ls = labels('Table t {\n  author_id integer [ref: > posts.|]\n}');
+    expect(ls).toEqual(expect.arrayContaining(['id', 'author_id']));
+  });
+  it('offers table names after a relation operator inside an inline ref', () => {
+    const ls = labels('Table t {\n  author_id integer [ref: > |]\n}');
+    expect(ls).toContain('users');
+    expect(ls).toContain('posts');
+  });
+  it('offers table names right after ref: inside settings', () => {
+    expect(labels('Table t {\n  x integer [ref: |]\n}')).toContain('users');
+  });
+  it('still offers setting keywords in plain settings', () => {
+    expect(labels('Table t {\n  id integer [|]\n}')).toContain('pk');
+  });
+});
+
+describe('long table headers', () => {
+  const HEADER =
+    'Table ecommerce_analytics.customer_order_history_archive_partitions as coh [headercolor: #3498DB] {';
+  it('detects table-body on an empty line despite a >80-char header', () => {
+    const { doc, pos } = ctxAt(`${HEADER}\n  |\n}`);
+    expect(detectContext(doc, pos).kind).toBe('table-body');
+  });
+  it('detects field-type in the type position despite a >80-char header', () => {
+    const { doc, pos } = ctxAt(`${HEADER}\n  col |\n}`);
+    expect(detectContext(doc, pos).kind).toBe('field-type');
+  });
+});
