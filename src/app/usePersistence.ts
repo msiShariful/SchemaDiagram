@@ -98,12 +98,22 @@ export async function duplicateDiagram(): Promise<void> {
 }
 
 export async function removeDiagram(id: string): Promise<void> {
-  // Must be the very first thing, synchronously (before any await): it
-  // cancels a debounce timer armed for this diagram and bumps the
-  // generation so that even a callback which manages to fire during the
-  // awaits below aborts instead of re-putting the record we're deleting —
-  // otherwise a debounced autosave can resurrect a just-deleted diagram.
-  invalidatePendingAutosave();
+  if (useAppStore.getState().diagramId === id) {
+    // Deleting the CURRENT diagram: must run first, synchronously (before
+    // any await) — it cancels a debounce timer armed for this diagram and
+    // bumps the generation so that even a callback which manages to fire
+    // during the awaits below aborts instead of re-putting the record
+    // we're deleting (a debounced autosave would resurrect it otherwise).
+    invalidatePendingAutosave();
+  } else {
+    // Deleting a NON-current diagram: a pending autosave belongs to the
+    // current diagram and cannot resurrect the deleted record (saveCurrent
+    // puts state.diagramId, which differs from `id`), so cancelling it
+    // would only risk silently losing the user's latest edit if they
+    // close/reload before another mutation re-arms the debounce. Flush it
+    // instead — belt and suspenders, and the semantics stay obvious.
+    await saveCurrent();
+  }
   try { await deleteDiagram(id); } catch { /* removal failing is non-fatal */ }
   if (useAppStore.getState().diagramId === id) {
     try {

@@ -69,4 +69,39 @@ describe('usePersistence — delete-resurrection race (Critical 1 regression)', 
 
     expect(await getDiagram(a.id)).toBeUndefined();
   });
+
+  it('deleting a NON-current diagram does not drop the current diagram\'s pending edit', async () => {
+    // Regression for the follow-up issue introduced by the first fix: an
+    // unconditional invalidatePendingAutosave() in removeDiagram cancelled
+    // the CURRENT diagram's pending 1s autosave even when deleting some
+    // OTHER diagram — if the user then closed/reloaded without another
+    // edit, that edit was silently never persisted. A pending save for the
+    // current diagram cannot resurrect a different deleted record
+    // (saveCurrent puts state.diagramId, not the deleted id), so the
+    // invalidation must only happen when deleting the current diagram.
+    const a = diagramA();
+    const b: PersistedDiagram = { ...diagramA(), id: 'diagram-b', name: 'B' };
+    await putDiagram(a);
+    await putDiagram(b);
+    useAppStore.getState().loadDiagram(a);
+
+    vi.useFakeTimers();
+
+    // Simulate typing in A: mutate state and arm the autosave.
+    const editedDbml = 'Table a { id int }\nTable edited_marker { id int }';
+    useAppStore.getState().setSource(editedDbml);
+    scheduleAutosave();
+
+    // Delete B (not the current diagram) inside A's debounce window.
+    const removed = removeDiagram(b.id);
+    await vi.runAllTimersAsync(); // drain fake-indexeddb's internal async completions
+    await removed;
+
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 500);
+    vi.useRealTimers();
+
+    const savedA = await getDiagram(a.id);
+    expect(savedA?.dbml).toBe(editedDbml); // A's edit persisted, not dropped
+    expect(await getDiagram(b.id)).toBeUndefined(); // B stays deleted
+  });
 });
