@@ -19,12 +19,14 @@ interface AppState {
   positions: Record<string, TablePosition>;
   viewport: Viewport;
   hoveredTableId: string | null;
+  editorFocusTableId: string | null;
   storageUnavailable: boolean;
   setSource(source: string): void;
   applyParse(result: ParseResult): void;
   moveTable(id: string, pos: TablePosition): void;
   setViewport(v: Viewport): void;
   setHoveredTable(id: string | null): void;
+  setEditorFocusTable(editorFocusTableId: string | null): void;
   setDiagramName(name: string): void;
   setStorageUnavailable(v: boolean): void;
   loadDiagram(rec: DiagramRecord): void;
@@ -41,6 +43,7 @@ export const useAppStore = create<AppState>()(
     positions: {},
     viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null,
+    editorFocusTableId: null,
     storageUnavailable: false,
 
     setSource: (source) => set({ source }),
@@ -59,6 +62,7 @@ export const useAppStore = create<AppState>()(
     moveTable: (id, pos) => set((s) => ({ positions: { ...s.positions, [id]: pos } })),
     setViewport: (viewport) => set({ viewport }),
     setHoveredTable: (hoveredTableId) => set({ hoveredTableId }),
+    setEditorFocusTable: (editorFocusTableId) => set({ editorFocusTableId }),
     setDiagramName: (diagramName) => set({ diagramName }),
     setStorageUnavailable: (storageUnavailable) => set({ storageUnavailable }),
 
@@ -73,6 +77,7 @@ export const useAppStore = create<AppState>()(
         errors: [],
         stale: true, // until the parse pipeline catches up
         hoveredTableId: null,
+        editorFocusTableId: null,
       }),
   })),
 );

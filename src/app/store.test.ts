@@ -7,7 +7,7 @@ const reset = () =>
   useAppStore.setState({
     diagramId: null, diagramName: 'Untitled', source: '', schema: EMPTY_SCHEMA,
     errors: [], stale: false, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
-    hoveredTableId: null, storageUnavailable: false,
+    hoveredTableId: null, storageUnavailable: false, editorFocusTableId: null,
   });
 
 describe('useAppStore', () => {
@@ -57,5 +57,23 @@ describe('useAppStore', () => {
     expect(st.source).toBe('Table x { id int }');
     expect(st.positions['public.x']).toEqual({ x: 5, y: 6 });
     expect(st.stale).toBe(true);
+  });
+});
+
+describe('editor focus table', () => {
+  beforeEach(reset);
+  it('sets and clears the focused table', () => {
+    useAppStore.getState().setEditorFocusTable('public.users');
+    expect(useAppStore.getState().editorFocusTableId).toBe('public.users');
+    useAppStore.getState().setEditorFocusTable(null);
+    expect(useAppStore.getState().editorFocusTableId).toBeNull();
+  });
+  it('loadDiagram clears the focused table', () => {
+    useAppStore.getState().setEditorFocusTable('public.users');
+    useAppStore.getState().loadDiagram({
+      id: 'd9', name: 'X', dbml: 'Table x { id int }',
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().editorFocusTableId).toBeNull();
   });
 });
