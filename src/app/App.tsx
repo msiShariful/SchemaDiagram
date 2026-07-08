@@ -5,6 +5,8 @@ import { useAppStore } from './store';
 import { DiagramManager } from './DiagramManager';
 import { usePersistence } from './usePersistence';
 import { SplitPane } from './SplitPane';
+import { ProblemsPanel } from './ProblemsPanel';
+import { applyFormat } from '../editor/editorNav';
 
 export function App() {
   useParsePipeline();
@@ -19,6 +21,14 @@ export function App() {
       <header className="toolbar">
         <span className="brand">DBDraft</span>
         <DiagramManager />
+        <button
+          className="format-button"
+          disabled={stale || errors.length > 0}
+          title="Format document (Ctrl/Cmd-Shift-F)"
+          onClick={() => applyFormat()}
+        >
+          Format
+        </button>
         {stale && <span className="badge stale">diagram out of date</span>}
       </header>
       {storageUnavailable && (
@@ -27,6 +37,7 @@ export function App() {
         </div>
       )}
       <SplitPane left={<DbmlEditor />} right={<DiagramCanvas />} />
+      <ProblemsPanel />
       <footer className="statusbar">
         <span className={errors.length ? 'status-errors' : 'status-ok'}>
           {errors.length ? `${errors.length} error${errors.length > 1 ? 's' : ''}` : '✓ parsed'}
