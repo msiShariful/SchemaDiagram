@@ -1,4 +1,10 @@
-import { parseDbml, type ParseResult } from './parseDbml';
+import type { ParseResult } from './parseDbml';
+
+// Lazily loaded: @dbml/core (~2.9 MB gz) must not be pulled into the main
+// chunk just to cover the rare paths below (no-Worker environments, or a
+// worker that has died). The worker chunk (parser.worker.ts) still imports
+// parseDbml eagerly/statically — that's the hot path and always needs it.
+const loadParser = () => import('./parseDbml');
 
 export interface WorkerParseAdapter {
   parse(source: string): Promise<ParseResult>;
@@ -11,7 +17,13 @@ export function createWorkerParse(): WorkerParseAdapter {
     worker = new Worker(new URL('./parser.worker.ts', import.meta.url), { type: 'module' });
   } catch {
     // No Worker support → in-thread for the lifetime of this adapter.
-    return { parse: async (source) => parseDbml(source), dispose() {} };
+    return {
+      parse: async (source) => {
+        const { parseDbml } = await loadParser();
+        return parseDbml(source);
+      },
+      dispose() {},
+    };
   }
 
   let nextId = 0;
@@ -24,9 +36,13 @@ export function createWorkerParse(): WorkerParseAdapter {
   const shutdown = () => {
     if (dead) return;
     dead = true;
-    for (const [id, p] of pending) {
-      p.resolve(parseDbml(p.source));
-      pending.delete(id);
+    if (pending.size > 0) {
+      void loadParser().then(({ parseDbml }) => {
+        for (const [id, p] of pending) {
+          p.resolve(parseDbml(p.source));
+          pending.delete(id);
+        }
+      });
     }
     worker.terminate();
   };
@@ -43,7 +59,7 @@ export function createWorkerParse(): WorkerParseAdapter {
 
   return {
     parse(source) {
-      if (dead) return Promise.resolve(parseDbml(source));
+      if (dead) return loadParser().then(({ parseDbml }) => parseDbml(source));
       return new Promise<ParseResult>((resolve) => {
         const id = nextId++;
         pending.set(id, { source, resolve });
