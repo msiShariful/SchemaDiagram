@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
 import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
 import { TableNode } from './TableNode';
 import { zoomAt } from './viewport';
+import { fitViewport } from './fitView';
+import { getTableRect } from '../core/model/geometry';
 import type { TablePosition, Viewport } from '../core/model/types';
 
 export function DiagramCanvas() {
@@ -12,6 +14,7 @@ export function DiagramCanvas() {
   const vpRef = useRef<Viewport>(useAppStore.getState().viewport);
   const zoomRef = useRef<number>(vpRef.current.zoom);
   const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
 
   // Stable across renders (refs never change identity) so a fresh inline
   // closure per table doesn't defeat TableNode's memo.
@@ -34,7 +37,7 @@ export function DiagramCanvas() {
     // sync when viewport changes externally (diagram load, zoom-to-fit)
     return useAppStore.subscribe(
       (s) => s.viewport,
-      (vp) => { vpRef.current = vp; applyTransform(); },
+      (vp) => { vpRef.current = vp; applyTransform(); setZoomPct(Math.round(vp.zoom * 100)); },
       { fireImmediately: true },
     );
   }, []);
@@ -47,6 +50,7 @@ export function DiagramCanvas() {
       vpRef.current = zoomAt(vpRef.current, { x: e.clientX - rect.left, y: e.clientY - rect.top }, e.deltaY);
       applyTransform();
       useAppStore.getState().setViewport(vpRef.current);
+      setZoomPct(Math.round(vpRef.current.zoom * 100));
     };
     svg.addEventListener('wheel', onWheel, { passive: false });
     return () => svg.removeEventListener('wheel', onWheel);
@@ -70,33 +74,56 @@ export function DiagramCanvas() {
     if (!panRef.current) return;
     panRef.current = null;
     useAppStore.getState().setViewport(vpRef.current);
+    setZoomPct(Math.round(vpRef.current.zoom * 100));
+  };
+
+  const zoomBy = (factor: number) => {
+    const svg = svgRef.current!;
+    const rect = svg.getBoundingClientRect();
+    vpRef.current = zoomAt(vpRef.current, { x: rect.width / 2, y: rect.height / 2 }, -Math.log(factor) / 0.0015);
+    applyTransform();
+    useAppStore.getState().setViewport(vpRef.current);
+  };
+  const fit = () => {
+    const { schema, positions } = useAppStore.getState();
+    const rects = schema.tables.filter((t) => positions[t.id]).map((t) => getTableRect(t, positions[t.id]));
+    const rect = svgRef.current!.getBoundingClientRect();
+    useAppStore.getState().setViewport(fitViewport(rects, rect.width, rect.height));
   };
 
   return (
-    <svg
-      ref={svgRef}
-      className="diagram-canvas"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      <g ref={sceneRef}>
-        <EdgeLayer ref={edgeLayerRef} />
-        {schema.tables.map((t) =>
-          positions[t.id] ? (
-            <TableNode
-              key={t.id}
-              table={t}
-              pos={positions[t.id]}
-              zoomRef={zoomRef}
-              onLiveMove={handleLiveMove}
-              onCommitMove={moveTable}
-              onHover={setHoveredTable}
-            />
-          ) : null,
-        )}
-      </g>
-    </svg>
+    <div className="canvas-wrap">
+      <svg
+        ref={svgRef}
+        className="diagram-canvas"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <g ref={sceneRef}>
+          <EdgeLayer ref={edgeLayerRef} />
+          {schema.tables.map((t) =>
+            positions[t.id] ? (
+              <TableNode
+                key={t.id}
+                table={t}
+                pos={positions[t.id]}
+                zoomRef={zoomRef}
+                onLiveMove={handleLiveMove}
+                onCommitMove={moveTable}
+                onHover={setHoveredTable}
+              />
+            ) : null,
+          )}
+        </g>
+      </svg>
+      <div className="zoom-controls">
+        <button onClick={() => zoomBy(1.2)}>+</button>
+        <button onClick={() => zoomBy(1 / 1.2)}>−</button>
+        <button onClick={fit}>fit</button>
+        <span>{zoomPct}%</span>
+      </div>
+    </div>
   );
 }

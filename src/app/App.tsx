@@ -4,6 +4,7 @@ import { useParsePipeline } from './useParsePipeline';
 import { useAppStore } from './store';
 import { DiagramManager } from './DiagramManager';
 import { usePersistence } from './usePersistence';
+import { SplitPane } from './SplitPane';
 
 export function App() {
   useParsePipeline();
@@ -25,15 +26,7 @@ export function App() {
           Browser storage is unavailable — your work is NOT being saved. Keep this tab open.
         </div>
       )}
-      <main className="workspace">
-        <section className="editor-pane">
-          <DbmlEditor />
-        </section>
-        <div className="divider" />
-        <section className="canvas-pane">
-          <DiagramCanvas />
-        </section>
-      </main>
+      <SplitPane left={<DbmlEditor />} right={<DiagramCanvas />} />
       <footer className="statusbar">
         <span className={errors.length ? 'status-errors' : 'status-ok'}>
           {errors.length ? `${errors.length} error${errors.length > 1 ? 's' : ''}` : '✓ parsed'}
