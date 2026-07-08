@@ -19,8 +19,16 @@ export function createParsePipeline(opts: {
     push(source: string) {
       if (disposed) return;
       if (timer) clearTimeout(timer);
+      // Bump the sequence here, not when the timer fires: a push() that
+      // lands while an earlier push's parse is already in flight (still
+      // inside ITS OWN debounce window, or awaiting opts.parse) must
+      // invalidate that in-flight work immediately. Bumping only at
+      // fire-time left a gap where a pending-but-not-yet-fired debounce
+      // (e.g. armed for a freshly loaded diagram) would not invalidate an
+      // older in-flight parse, so a stale result could land after a
+      // diagram switch.
+      const mySeq = ++seq;
       timer = setTimeout(() => {
-        const mySeq = ++seq;
         void opts.parse(source).then((result) => {
           if (!disposed && mySeq === seq) opts.onResult(result);
         });

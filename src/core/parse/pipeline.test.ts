@@ -54,4 +54,38 @@ describe('createParsePipeline', () => {
     await vi.runAllTimersAsync();
     expect(onResult).not.toHaveBeenCalled();
   });
+
+  it('invalidates an in-flight parse when a push arrives during its debounce window (diagram-switch race)', async () => {
+    // Regression for: push(A) fires and its parse is in flight; push(B)
+    // arrives (e.g. a diagram switch) while still inside B's own debounce
+    // window, i.e. before B's timer has fired. A's late result must NOT be
+    // delivered — only bumping `seq` when a timer *fires* misses this,
+    // because at the moment A resolves, B's timer hasn't fired yet either,
+    // so a fire-time-only bump would still equal A's captured sequence.
+    const resolvers: Array<(r: ParseResult) => void> = [];
+    const parse = vi.fn(
+      (s: string) => new Promise<ParseResult>((res) => resolvers.push((r) => res(r ?? okResult(s)))),
+    );
+    const onResult = vi.fn();
+    const p = createParsePipeline({ parse, onResult, debounceMs: 10 });
+
+    p.push('A');
+    await vi.advanceTimersByTimeAsync(10); // A's debounce elapses; parse('A') now in flight
+    expect(parse).toHaveBeenCalledTimes(1);
+
+    p.push('B'); // arrives while A is in flight, still inside B's own debounce window
+    expect(parse).toHaveBeenCalledTimes(1); // B hasn't fired yet
+
+    resolvers[0](okResult('A')); // A's parse resolves late
+    await vi.advanceTimersByTimeAsync(0); // flush A's .then() without letting B's timer fire
+    expect(onResult).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(10); // B's debounce elapses
+    expect(parse).toHaveBeenCalledTimes(2);
+    resolvers[1](okResult('B'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onResult).toHaveBeenCalledTimes(1);
+    expect((onResult.mock.calls[0][0] as ParseResult & { ok: true }).schema.notes[0].id).toBe('B');
+    p.dispose();
+  });
 });
