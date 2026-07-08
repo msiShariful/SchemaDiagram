@@ -134,8 +134,12 @@ disturbed by edits — auto-layout runs only on explicit button press (with canv
   exact line/col; squiggles + collapsible problems panel.
 - **Two-way navigation:** cursor inside a table definition softly highlights that table on
   canvas; double-clicking a canvas table scrolls/flashes its definition in the editor.
-- **Format document:** re-emits canonical DBML from the parsed model. Enabled only when the
-  parse is clean, so formatting never eats content the parser couldn't understand.
+- **Format document:** normalizes whitespace in place — indentation by block depth,
+  trailing-whitespace removal, blank-run collapsing, single space before `{` — without
+  re-emitting from the parsed model, so `//` comments and string content are never lost.
+  Enabled only when the parse is clean, so structurally broken code is never re-indented
+  misleadingly. *(Revised 2026-07-08: the original "re-emit canonical DBML from the model"
+  approach would silently drop comments, contradicting the never-lose-content principle.)*
 
 ## 8. Persistence & recovery
 
