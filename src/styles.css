@@ -45,3 +45,18 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .edge.hot path { stroke: var(--edge-hover); stroke-width: 2.5; }
 .edge-label { font-size: 10px; fill: var(--text-dim); }
 .edge.hot .edge-label { fill: var(--edge-hover); }
+.diagram-manager { display: flex; align-items: center; gap: 6px; position: relative; }
+.diagram-manager button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; }
+.diagram-manager .name-button { font-weight: 600; }
+.diagram-manager .name-input { font-size: 12px; padding: 3px 6px; }
+.diagram-list {
+  position: absolute; top: 30px; left: 0; z-index: 20; min-width: 340px;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); list-style: none; margin: 0; padding: 4px;
+}
+.diagram-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; }
+.diagram-list li.current { background: #eef3fe; }
+.diagram-list .open-button { flex: 1; text-align: left; border: none; background: none; font-weight: 500; }
+.diagram-list .when { font-size: 10px; color: var(--text-dim); }
+.diagram-list .danger { color: var(--error); }
+.banner-warning { background: #fdecea; color: #a33; padding: 6px 12px; font-size: 13px; }
