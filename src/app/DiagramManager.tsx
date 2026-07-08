@@ -12,7 +12,12 @@ export function DiagramManager() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
 
+  const refresh = () => {
+    void listDiagrams().then(setItems).catch(() => setItems([]));
+  };
+
   useEffect(() => {
+    setConfirmingId(null); // an armed delete must not survive close/reopen or a diagram switch
     if (open) void listDiagrams().then(setItems).catch(() => setItems([]));
   }, [open, diagramId]);
 
@@ -23,7 +28,7 @@ export function DiagramManager() {
           className="name-input"
           autoFocus
           defaultValue={diagramName}
-          onBlur={(e) => { renameDiagram(e.target.value); setEditingName(false); }}
+          onBlur={(e) => { void renameDiagram(e.target.value).then(refresh); setEditingName(false); }}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         />
       ) : (
@@ -44,7 +49,7 @@ export function DiagramManager() {
               <span className="when">{new Date(d.updatedAt).toLocaleString()}</span>
               {confirmingId === d.id ? (
                 <>
-                  <button className="danger" onClick={() => { void removeDiagram(d.id); setConfirmingId(null); }}>confirm ✓</button>
+                  <button className="danger" onClick={() => { void removeDiagram(d.id).then(refresh); setConfirmingId(null); }}>confirm ✓</button>
                   <button onClick={() => setConfirmingId(null)}>✕</button>
                 </>
               ) : (

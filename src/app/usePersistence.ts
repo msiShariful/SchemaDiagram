@@ -25,8 +25,13 @@ async function saveCurrent(): Promise<void> {
 
 export async function switchDiagram(id: string): Promise<void> {
   await saveCurrent();
-  const rec = await getDiagram(id);
-  if (rec) useAppStore.getState().loadDiagram(rec);
+  try {
+    const rec = await getDiagram(id);
+    if (rec) useAppStore.getState().loadDiagram(rec);
+  } catch {
+    // Read failed: flag storage and stay on the current diagram.
+    useAppStore.getState().setStorageUnavailable(true);
+  }
 }
 
 export async function createDiagram(): Promise<void> {
@@ -37,6 +42,10 @@ export async function createDiagram(): Promise<void> {
 }
 
 export async function duplicateDiagram(): Promise<void> {
+  // Flush the original first: a pending debounced autosave is otherwise
+  // re-scheduled after loadDiagram(copy) and would read the COPY's state,
+  // leaving the original's record stale (typed edits lost on switch-back).
+  await saveCurrent();
   const cur = currentRecord();
   if (!cur) return;
   const copy: DiagramRecord = { ...cur, id: nanoid(), name: `${cur.name} copy`, updatedAt: Date.now() };
@@ -47,14 +56,29 @@ export async function duplicateDiagram(): Promise<void> {
 export async function removeDiagram(id: string): Promise<void> {
   try { await deleteDiagram(id); } catch { /* removal failing is non-fatal */ }
   if (useAppStore.getState().diagramId === id) {
-    const rest = await listDiagrams();
-    if (rest.length > 0) useAppStore.getState().loadDiagram(rest[0]);
-    else await createDiagram();
+    try {
+      const rest = await listDiagrams();
+      if (rest.length > 0) {
+        useAppStore.getState().loadDiagram(rest[0]);
+        return;
+      }
+    } catch {
+      useAppStore.getState().setStorageUnavailable(true);
+    }
+    // Store empty or unreadable: fall back to a fresh starter diagram.
+    // Deliberately NOT createDiagram(): its saveCurrent() flush would re-put
+    // the record we just deleted (state still points at it), resurrecting it.
+    const rec = createStarterDiagram();
+    try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
+    useAppStore.getState().loadDiagram(rec);
   }
 }
 
-export function renameDiagram(name: string): void {
+export function renameDiagram(name: string): Promise<void> {
   useAppStore.getState().setDiagramName(name.trim() || 'Untitled');
+  // Flush immediately (instead of waiting out the 1s debounce) so callers
+  // can refresh the persisted diagram list right after the rename lands.
+  return saveCurrent();
 }
 
 export function usePersistence(): void {
