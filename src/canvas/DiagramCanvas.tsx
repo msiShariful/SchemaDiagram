@@ -1,27 +1,22 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../app/store';
+import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
 import { TableNode } from './TableNode';
 import { zoomAt } from './viewport';
 import type { TablePosition, Viewport } from '../core/model/types';
 
-interface Props {
-  onTableLiveMove?: (id: string, pos: TablePosition) => void;
-  children?: ReactNode; // edge layer renders under tables
-}
-
-export function DiagramCanvas({ onTableLiveMove, children }: Props) {
+export function DiagramCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const sceneRef = useRef<SVGGElement>(null);
+  const edgeLayerRef = useRef<EdgeLayerHandle>(null);
   const vpRef = useRef<Viewport>(useAppStore.getState().viewport);
   const zoomRef = useRef<number>(vpRef.current.zoom);
   const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
-  // Keep the latest prop in a ref so handleLiveMove stays referentially stable
-  // across renders (a fresh inline closure per table would defeat TableNode's memo).
-  const onTableLiveMoveRef = useRef(onTableLiveMove);
-  onTableLiveMoveRef.current = onTableLiveMove;
+  // Stable across renders (refs never change identity) so a fresh inline
+  // closure per table doesn't defeat TableNode's memo.
   const handleLiveMove = useCallback((id: string, pos: TablePosition) => {
-    onTableLiveMoveRef.current?.(id, pos);
+    edgeLayerRef.current?.updateTablePosition(id, pos);
   }, []);
 
   const schema = useAppStore((s) => s.schema);
@@ -87,7 +82,7 @@ export function DiagramCanvas({ onTableLiveMove, children }: Props) {
       onPointerCancel={onPointerUp}
     >
       <g ref={sceneRef}>
-        {children}
+        <EdgeLayer ref={edgeLayerRef} />
         {schema.tables.map((t) =>
           positions[t.id] ? (
             <TableNode

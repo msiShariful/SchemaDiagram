@@ -41,3 +41,7 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .status-errors { color: var(--error); }
 .status-dim { color: var(--text-dim); }
 .badge.stale { font-size: 11px; color: #92600a; background: #fdf0d5; padding: 2px 8px; border-radius: 10px; }
+.edge path { fill: none; stroke: var(--edge); stroke-width: 1.5; }
+.edge.hot path { stroke: var(--edge-hover); stroke-width: 2.5; }
+.edge-label { font-size: 10px; fill: var(--text-dim); }
+.edge.hot .edge-label { fill: var(--edge-hover); }
