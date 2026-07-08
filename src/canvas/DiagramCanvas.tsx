@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
 import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
 import { TableNode } from './TableNode';
@@ -33,8 +33,11 @@ export function DiagramCanvas() {
     sceneRef.current?.setAttribute('transform', `translate(${x}, ${y}) scale(${zoom})`);
   };
 
-  useEffect(() => {
-    // sync when viewport changes externally (diagram load, zoom-to-fit)
+  useLayoutEffect(() => {
+    // sync when viewport changes externally (diagram load, zoom-to-fit).
+    // Layout-timed so a freshly loaded diagram's viewport is applied before
+    // paint — a passive effect here would let one frame render at the
+    // previous (usually wrong) viewport first.
     return useAppStore.subscribe(
       (s) => s.viewport,
       (vp) => { vpRef.current = vp; applyTransform(); setZoomPct(Math.round(vp.zoom * 100)); },

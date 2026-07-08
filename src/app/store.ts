@@ -3,17 +3,11 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import type { Schema, TablePosition, Viewport } from '../core/model/types';
 import { EMPTY_SCHEMA } from '../core/model/types';
 import type { ParseError, ParseResult } from '../core/parse/parseDbml';
+import type { PersistedDiagram } from '../core/persist/repository';
 import { reconcilePositions } from '../core/model/reconcile';
 import { placeNewTables } from '../core/layout/placement';
 
-export interface DiagramRecord {
-  id: string;
-  name: string;
-  dbml: string;
-  positions: Record<string, TablePosition>;
-  viewport: Viewport;
-  updatedAt: number;
-}
+export type DiagramRecord = PersistedDiagram;
 
 interface AppState {
   diagramId: string | null;
