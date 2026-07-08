@@ -9,9 +9,11 @@ interface Props {
   onLiveMove: (id: string, pos: TablePosition) => void;
   onCommitMove: (id: string, pos: TablePosition) => void;
   onHover: (id: string | null) => void;
+  focused: boolean;
+  onOpenInEditor: (id: string) => void;
 }
 
-export const TableNode = memo(function TableNode({ table, pos, zoomRef, onLiveMove, onCommitMove, onHover }: Props) {
+export const TableNode = memo(function TableNode({ table, pos, zoomRef, onLiveMove, onCommitMove, onHover, focused, onOpenInEditor }: Props) {
   const gRef = useRef<SVGGElement>(null);
   const drag = useRef<{ startX: number; startY: number; origX: number; origY: number; live: TablePosition } | null>(null);
   const h = tableHeight(table.fields.length);
@@ -44,13 +46,14 @@ export const TableNode = memo(function TableNode({ table, pos, zoomRef, onLiveMo
     <g
       ref={gRef}
       transform={`translate(${pos.x}, ${pos.y})`}
-      className="table-node"
+      className={`table-node${focused ? ' focused' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onPointerEnter={() => onHover(table.id)}
       onPointerLeave={() => onHover(null)}
+      onDoubleClick={() => onOpenInEditor(table.id)}
     >
       <rect width={TABLE_WIDTH} height={h} rx={6} className="table-body" />
       <rect width={TABLE_WIDTH} height={HEADER_HEIGHT} rx={6} className="table-header" fill={table.headerColor ?? undefined} />

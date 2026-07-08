@@ -5,6 +5,7 @@ import { TableNode } from './TableNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
 import { getTableRect } from '../core/model/geometry';
+import { revealTable } from '../editor/editorNav';
 import type { TablePosition, Viewport } from '../core/model/types';
 
 export function DiagramCanvas() {
@@ -26,6 +27,7 @@ export function DiagramCanvas() {
   const positions = useAppStore((s) => s.positions);
   const moveTable = useAppStore((s) => s.moveTable);
   const setHoveredTable = useAppStore((s) => s.setHoveredTable);
+  const editorFocusTableId = useAppStore((s) => s.editorFocusTableId);
 
   const applyTransform = () => {
     const { x, y, zoom } = vpRef.current;
@@ -116,6 +118,8 @@ export function DiagramCanvas() {
                 onLiveMove={handleLiveMove}
                 onCommitMove={moveTable}
                 onHover={setHoveredTable}
+                focused={t.id === editorFocusTableId}
+                onOpenInEditor={revealTable}
               />
             ) : null,
           )}
