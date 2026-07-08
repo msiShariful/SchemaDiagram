@@ -21,6 +21,7 @@ export function DbmlEditor() {
       if (!update.selectionSet && !update.docChanged) return;
       if (focusTimer) clearTimeout(focusTimer);
       focusTimer = setTimeout(() => {
+        if (!view.hasFocus) return;
         const pos = view.state.selection.main.head;
         const range = tableAtPos(buildTableRanges(view.state.doc.toString()), pos);
         useAppStore.getState().setEditorFocusTable(range?.tableId ?? null);
