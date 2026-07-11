@@ -7,6 +7,9 @@ import { usePersistence } from './usePersistence';
 import { SplitPane } from './SplitPane';
 import { ProblemsPanel } from './ProblemsPanel';
 import { applyFormat } from '../editor/editorNav';
+import { ExportMenu } from './ExportMenu';
+import { downloadText } from './export/download';
+import { safeFilename } from './export/exportCss';
 
 export function App() {
   useParsePipeline();
@@ -29,11 +32,21 @@ export function App() {
         >
           Format
         </button>
+        <ExportMenu />
         {stale && <span className="badge stale">diagram out of date</span>}
       </header>
       {storageUnavailable && (
         <div className="banner-warning">
-          Browser storage is unavailable — your work is NOT being saved. Keep this tab open.
+          <span>Browser storage is unavailable — your work is NOT being saved. Keep this tab open.</span>
+          <button
+            className="banner-action"
+            onClick={() => {
+              const s = useAppStore.getState();
+              downloadText(s.source, `${safeFilename(s.diagramName)}.dbml`);
+            }}
+          >
+            Download your work (.dbml)
+          </button>
         </div>
       )}
       <SplitPane left={<DbmlEditor />} right={<DiagramCanvas />} />

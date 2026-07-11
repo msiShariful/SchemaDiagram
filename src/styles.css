@@ -74,3 +74,15 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .problems-list button:hover { background: #ffecec; }
 .problem-loc { color: var(--text-dim); font-family: ui-monospace, monospace; margin-right: 6px; }
 .table-node.focused .table-body { stroke: var(--accent); stroke-width: 2; }
+.export-menu { position: relative; }
+.export-menu > button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; }
+.export-list {
+  position: absolute; top: 30px; left: 0; z-index: 20; min-width: 200px;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); list-style: none; margin: 0; padding: 4px;
+}
+.export-list button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 6px 10px; cursor: pointer; border-radius: 4px; font-size: 12px; }
+.export-list button:hover:not(:disabled) { background: #eef3fe; }
+.export-list button:disabled { opacity: 0.45; cursor: not-allowed; }
+.banner-warning { display: flex; align-items: center; gap: 12px; }
+.banner-action { border: 1px solid #a33; background: #fff; color: #a33; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
