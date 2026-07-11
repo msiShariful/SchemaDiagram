@@ -9,7 +9,7 @@ const reset = () => {
     diagramId: null, diagramName: 'Untitled', source: '', schema: EMPTY_SCHEMA,
     errors: [], stale: false, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null, storageUnavailable: false, editorFocusTableId: null,
-    parsedSource: null, notePositions: {},
+    parsedSource: null, notePositions: {}, selectedTableIds: [],
   });
 };
 
@@ -204,5 +204,31 @@ describe('canvas command stack', () => {
       positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
     });
     expect(getCanvasStack().canUndo()).toBe(false);
+  });
+});
+
+describe('table selection', () => {
+  beforeEach(reset);
+  it('sets and clears the selection', () => {
+    useAppStore.getState().setSelectedTables(['public.a', 'public.b']);
+    expect(useAppStore.getState().selectedTableIds).toEqual(['public.a', 'public.b']);
+    useAppStore.getState().setSelectedTables([]);
+    expect(useAppStore.getState().selectedTableIds).toEqual([]);
+  });
+  it('applyParse prunes selected ids for deleted tables', () => {
+    const src1 = 'Table a { id int }\nTable b { id int }';
+    useAppStore.getState().applyParse(parseDbml(src1), src1);
+    useAppStore.getState().setSelectedTables(['public.a', 'public.b']);
+    const src2 = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(src2), src2);
+    expect(useAppStore.getState().selectedTableIds).toEqual(['public.a']);
+  });
+  it('loadDiagram clears the selection', () => {
+    useAppStore.getState().setSelectedTables(['public.a']);
+    useAppStore.getState().loadDiagram({
+      id: 'd4', name: 'Z', dbml: 'Table z { id int }',
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().selectedTableIds).toEqual([]);
   });
 });

@@ -56,6 +56,7 @@ interface AppState {
   storageUnavailable: boolean;
   parsedSource: string | null;
   notePositions: Record<string, TablePosition>;
+  selectedTableIds: string[];
   setSource(source: string): void;
   applyParse(result: ParseResult, source: string): void;
   moveTable(id: string, pos: TablePosition): void;
@@ -64,6 +65,7 @@ interface AppState {
   setEditorFocusTable(editorFocusTableId: string | null): void;
   setDiagramName(name: string): void;
   setStorageUnavailable(v: boolean): void;
+  setSelectedTables(ids: string[]): void;
   loadDiagram(rec: DiagramRecord): void;
   commitCanvasCommand(cmd: CanvasCommand): void;
   undoCanvas(): void;
@@ -85,6 +87,7 @@ export const useAppStore = create<AppState>()(
     storageUnavailable: false,
     parsedSource: null,
     notePositions: {},
+    selectedTableIds: [],
 
     setSource: (source) => set({ source }),
 
@@ -93,12 +96,14 @@ export const useAppStore = create<AppState>()(
         set({ errors: result.errors, stale: true });
         return;
       }
-      const { schema: prev, positions } = get();
+      const { schema: prev, positions, selectedTableIds } = get();
       const kept = reconcilePositions(prev, result.schema, positions);
       const placed = placeNewTables(result.schema, kept);
+      const tableIds = new Set(result.schema.tables.map((t) => t.id));
       set({
         schema: result.schema,
         positions: { ...kept, ...placed },
+        selectedTableIds: selectedTableIds.filter((id) => tableIds.has(id)),
         errors: [],
         stale: false,
         parsedSource: source,
@@ -134,6 +139,7 @@ export const useAppStore = create<AppState>()(
     setEditorFocusTable: (editorFocusTableId) => set({ editorFocusTableId }),
     setDiagramName: (diagramName) => set({ diagramName }),
     setStorageUnavailable: (storageUnavailable) => set({ storageUnavailable }),
+    setSelectedTables: (selectedTableIds) => set({ selectedTableIds }),
 
     loadDiagram: (rec) => {
       resetCanvasStack();
@@ -150,6 +156,7 @@ export const useAppStore = create<AppState>()(
         parsedSource: null,
         hoveredTableId: null,
         editorFocusTableId: null,
+        selectedTableIds: [],
       });
     },
   })),

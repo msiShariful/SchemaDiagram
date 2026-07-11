@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TABLE_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, tableHeight, fieldRowY, getTableRect } from './geometry';
+import { TABLE_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, tableHeight, fieldRowY, getTableRect, rectsOverlap } from './geometry';
 import type { Table } from './types';
 
 const table = (fieldCount: number): Table => ({
@@ -22,5 +22,15 @@ describe('geometry', () => {
   });
   it('builds table rect from position', () => {
     expect(getTableRect(table(2), { x: 10, y: 20 })).toEqual({ x: 10, y: 20, w: TABLE_WIDTH, h: tableHeight(2) });
+  });
+});
+
+describe('rectsOverlap', () => {
+  it('detects intersection and rejects separation', () => {
+    expect(rectsOverlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 })).toBe(true);
+    expect(rectsOverlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 20, y: 0, w: 10, h: 10 })).toBe(false);
+  });
+  it('treats touching edges as non-overlapping', () => {
+    expect(rectsOverlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 10, y: 0, w: 10, h: 10 })).toBe(false);
   });
 });
