@@ -295,7 +295,7 @@ git add -A && git commit -m "fix: gate format on parsedSource matching the doc (
 - Produces (store):
   - State: `notePositions: Record<string, TablePosition>` (initial `{}`).
   - Module level in `store.ts` (deliberately NOT zustand state: nothing renders from the stack, and mutating an object held inside state in place would never notify subscribers anyway): one `CommandStack` instance, exposed as `getCanvasStack(): CommandStack` and `resetCanvasStack(): void` (fresh stack — called by `loadDiagram` and by tests).
-  - Actions: `commitCanvasCommand(cmd: CanvasCommand): void` (prunes zero-deltas; a no-op command is silently dropped — THE zero-delta guard, one place for every caller), `undoCanvas(): void`, `redoCanvas(): void`. Undo/redo apply a delta ONLY if its table/note still exists in the current schema — undoing across a deletion must never resurrect a dead position key (it would be autosaved until the next clean parse prunes it).
+  - Actions: `commitCanvasCommand(cmd: CanvasCommand): void` (prunes zero-deltas; a no-op command is silently dropped — THE zero-delta guard, one place for every caller), `undoCanvas(): void`, `redoCanvas(): void`. Undo/redo apply a delta ONLY if its table/note still has an entry in the current positions/notePositions maps (equivalent to schema membership for tables, since reconcilePositions prunes `positions` to the live schema on every successful parse; the only source of truth for notes until the notes normalizer lands) — undoing across a deletion must never resurrect a dead position key (it would be autosaved until the next clean parse prunes it).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -610,17 +610,20 @@ export function resetCanvasStack(): void {
 
 // Undo/redo may replay a command whose table/note a later edit deleted;
 // applying that delta would resurrect a dead position key (autosaved until
-// the next clean parse prunes it). Apply only ids that still exist.
+// the next clean parse prunes it). Apply only ids still tracked in the
+// current position maps. For tables this matches "still exists in the
+// schema": reconcilePositions() prunes `positions` to the live schema on
+// every successful parse. Notes have no schema-backed existence until the
+// notes normalizer lands (Task 9), so the notePositions map itself is the
+// only source of truth available.
 function applyCommandSide(
-  s: Pick<AppState, 'schema' | 'positions' | 'notePositions'>,
+  s: Pick<AppState, 'positions' | 'notePositions'>,
   cmd: CanvasCommand,
   key: 'before' | 'after',
 ): Pick<AppState, 'positions' | 'notePositions'> {
-  const tableIds = new Set(s.schema.tables.map((t) => t.id));
-  const noteIds = new Set(s.schema.notes.map((n) => n.id));
   return {
-    positions: applyDeltas(s.positions, cmd.tables.filter((d) => tableIds.has(d.id)), key),
-    notePositions: applyDeltas(s.notePositions, cmd.notes.filter((d) => noteIds.has(d.id)), key),
+    positions: applyDeltas(s.positions, cmd.tables.filter((d) => d.id in s.positions), key),
+    notePositions: applyDeltas(s.notePositions, cmd.notes.filter((d) => d.id in s.notePositions), key),
   };
 }
 ```
@@ -2266,7 +2269,7 @@ git add -A && git commit -m "feat: minimap with live viewport tracking and click
 
 ### Task 9: Normalizer — TableGroups + sticky notes
 
-The `Schema` contract already has `groups: TableGroup[]` and `notes: StickyNote[]` (Plan 1 types); the normalizer currently emits them empty. This task fills them from the `@dbml/core` 8.3 parse. The raw property names live at the `any` boundary — if 8.3 places them differently (e.g. group color under `tg.settings.color`, notes only on `db.notes` or only per-schema), adapt the NORMALIZER property access; the fixtures and our-`Schema` expectations stay.
+The `Schema` contract already has `groups: TableGroup[]` and `notes: StickyNote[]` (Plan 1 types); the normalizer currently emits them empty. This task fills them from the `@dbml/core` 8.3 parse. The raw property names live at the `any` boundary — if 8.3 places them differently (e.g. group color under `tg.settings.color`, notes only on `db.notes` or only per-schema), adapt the NORMALIZER property access; the fixtures and our-`Schema` expectations stay. NOTE: once `schema.notes` is populated, verify `notePositions` gets a reconcile-then-place pass analogous to `reconcilePositions`/`placeNewTables` so the undo filter predicate in `applyCommandSide` stays equivalent for notes (see store.ts comment).
 
 **Files:**
 - Modify: `src/core/parse/parseDbml.ts`
