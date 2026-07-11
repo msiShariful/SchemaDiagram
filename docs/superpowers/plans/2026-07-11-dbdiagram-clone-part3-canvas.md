@@ -772,15 +772,19 @@ describe('snapPosition', () => {
   });
 
   it('falls back to grid outside the tolerance', () => {
-    const others: Rect[] = [{ x: 100, y: 400, w: 220, h: 120 }];
-    const r = snapPosition({ x: 108, y: 100 }, size, others); // 8 > SNAP_TOLERANCE
+    // same width as the dragged box → all three horizontal candidates
+    // (left 108 vs 100, center 208 vs 200, right 308 vs 300) are 8 > SNAP_TOLERANCE
+    const others: Rect[] = [{ x: 100, y: 400, w: 200, h: 120 }];
+    const r = snapPosition({ x: 108, y: 100 }, size, others);
     expect(SNAP_TOLERANCE).toBe(6);
     expect(r.pos.x).toBe(112);
     expect(r.guides).toEqual([]);
   });
 
   it('honors a custom tolerance (zoom-scaled by the caller)', () => {
-    const others: Rect[] = [{ x: 100, y: 400, w: 220, h: 120 }];
+    // all three horizontal candidates are 8 apart; 8 <= 20 → left-to-left
+    // (first found) wins the tie
+    const others: Rect[] = [{ x: 100, y: 400, w: 200, h: 120 }];
     const r = snapPosition({ x: 108, y: 100 }, size, others, 20);
     expect(r.pos.x).toBe(100);
   });
