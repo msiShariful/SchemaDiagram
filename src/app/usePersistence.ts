@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { useAppStore, type DiagramRecord } from './store';
-import { listDiagrams, getDiagram, putDiagram, deleteDiagram } from '../core/persist/repository';
+import {
+  listDiagrams, getDiagram, putDiagram, deleteDiagram, listSnapshots, putSnapshot,
+} from '../core/persist/repository';
+import type { DiagramSnapshot } from '../core/persist/repository';
+import type { TablePosition, Viewport } from '../core/model/types';
 import { createStarterDiagram } from './starter';
 import { nanoid } from 'nanoid';
 
@@ -27,6 +31,39 @@ function currentRecord(): DiagramRecord | null {
   };
 }
 
+// Snapshot policy (History): every successful diagram write below produces
+// a snapshot CANDIDATE. It is kept only when (a) the parse state LOOKS
+// clean (`!stale && errors.length === 0`) and (b) the text differs from the
+// newest stored snapshot. Note the gate is approximate: stale/errors
+// reflect the last COMPLETED parse, so a slow worker parse still in flight
+// when the 1 s autosave fires can let a not-yet-validated text through —
+// same race class as the applyFormat stale-check ledger item; move to a
+// `parsedSource === dbml` gate once a parsedSource field exists.
+// Layout-only saves (drag/pan) and the keystroke stream (1 s debounce)
+// never snapshot. Runs strictly AFTER putDiagram has succeeded and swallows
+// every failure: history is best-effort and must never break, abort, or
+// reorder the diagram save itself.
+async function maybeSnapshot(rec: DiagramRecord): Promise<void> {
+  const s = useAppStore.getState();
+  if (s.stale || s.errors.length > 0) return;
+  try {
+    const newest = (await listSnapshots(rec.id))[0];
+    if (newest && newest.dbml === rec.dbml) return;
+    await putSnapshot({
+      id: nanoid(),
+      diagramId: rec.id,
+      takenAt: rec.updatedAt,
+      name: rec.name,
+      dbml: rec.dbml,
+      positions: rec.positions,
+      viewport: rec.viewport,
+    });
+  } catch {
+    // best-effort: the diagram row itself was already saved above; a failed
+    // snapshot write must not surface or flip the storage banner.
+  }
+}
+
 async function saveCurrent(): Promise<void> {
   const rec = currentRecord();
   if (!rec) return;
@@ -34,7 +71,9 @@ async function saveCurrent(): Promise<void> {
     await putDiagram(rec);
   } catch {
     useAppStore.getState().setStorageUnavailable(true);
+    return;
   }
+  await maybeSnapshot(rec);
 }
 
 // Cancels any pending debounced autosave and bumps the generation so a
@@ -139,6 +178,68 @@ export function renameDiagram(name: string): Promise<void> {
   // Flush immediately (instead of waiting out the 1s debounce) so callers
   // can refresh the persisted diagram list right after the rename lands.
   return saveCurrent();
+}
+
+export interface ImportedDiagram {
+  name: string;
+  dbml: string;
+  positions?: Record<string, TablePosition>;
+  viewport?: Viewport;
+}
+
+// Import ALWAYS creates a new diagram — it must never overwrite the current
+// one (spec §3). Exact same discipline as createDiagram: flush the current
+// diagram, then synchronously invalidate its pending autosave before the
+// awaits tied to the switch.
+export async function importDiagram(imp: ImportedDiagram): Promise<void> {
+  await saveCurrent();
+  invalidatePendingAutosave();
+  const rec: DiagramRecord = {
+    id: nanoid(),
+    name: imp.name.trim() || 'Imported',
+    dbml: imp.dbml,
+    positions: imp.positions ?? {},
+    viewport: imp.viewport ?? { x: 40, y: 40, zoom: 1 },
+    updatedAt: Date.now(),
+  };
+  try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
+  useAppStore.getState().loadDiagram(rec);
+}
+
+// Restore a snapshot into the CURRENT diagram (same id). Non-destructive:
+// the pre-restore state is checkpointed first (deduped against the newest
+// snapshot), so a restore can itself be undone from the History panel.
+// The checkpoint deliberately has no clean-parse gate — restore must never
+// destroy state, even mid-error.
+export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
+  const cur = currentRecord();
+  if (!cur || cur.id !== snap.diagramId) return;
+  invalidatePendingAutosave();
+  try {
+    const newest = (await listSnapshots(cur.id))[0];
+    if (!newest || newest.dbml !== cur.dbml) {
+      await putSnapshot({
+        id: nanoid(), diagramId: cur.id, takenAt: Date.now(), name: cur.name,
+        dbml: cur.dbml, positions: cur.positions, viewport: cur.viewport,
+      });
+    }
+  } catch {
+    // history is best-effort; the restore itself proceeds
+  }
+  const rec: DiagramRecord = {
+    id: cur.id, name: snap.name, dbml: snap.dbml,
+    positions: snap.positions, viewport: snap.viewport, updatedAt: Date.now(),
+  };
+  try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
+  if (snap.dbml === cur.dbml) {
+    // Text unchanged: loadDiagram would reset schema to EMPTY_SCHEMA and the
+    // parse pipeline — keyed on [diagramId, source], both unchanged — would
+    // never re-fire, leaving a blank canvas. Patch layout state directly and
+    // keep the live schema.
+    useAppStore.setState({ diagramName: rec.name, positions: rec.positions, viewport: rec.viewport });
+  } else {
+    useAppStore.getState().loadDiagram(rec);
+  }
 }
 
 export function usePersistence(): void {
