@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useAppStore } from './store';
+import { useAppStore, getCanvasStack, resetCanvasStack } from './store';
 import { parseDbml } from '../core/parse/parseDbml';
 import { EMPTY_SCHEMA } from '../core/model/types';
 
-const reset = () =>
+const reset = () => {
+  resetCanvasStack();
   useAppStore.setState({
     diagramId: null, diagramName: 'Untitled', source: '', schema: EMPTY_SCHEMA,
     errors: [], stale: false, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null, storageUnavailable: false, editorFocusTableId: null,
-    parsedSource: null,
+    parsedSource: null, notePositions: {},
   });
+};
 
 describe('useAppStore', () => {
   beforeEach(reset);
@@ -105,5 +107,102 @@ describe('editor focus table', () => {
       positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
     });
     expect(useAppStore.getState().editorFocusTableId).toBeNull();
+  });
+});
+
+describe('canvas command stack', () => {
+  beforeEach(reset);
+  const seed = () => {
+    const src = 'Table a { id int }\nTable b { id int }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+  };
+
+  it('commit applies after-positions and undo/redo round-trips', () => {
+    seed();
+    const before = useAppStore.getState().positions['public.a'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table',
+      tables: [{ id: 'public.a', before, after: { x: 900, y: 40 } }],
+      notes: [],
+    });
+    expect(useAppStore.getState().positions['public.a']).toEqual({ x: 900, y: 40 });
+    useAppStore.getState().undoCanvas();
+    expect(useAppStore.getState().positions['public.a']).toEqual(before);
+    useAppStore.getState().redoCanvas();
+    expect(useAppStore.getState().positions['public.a']).toEqual({ x: 900, y: 40 });
+  });
+
+  it('zero-delta commit is dropped — no state change, no undo entry', () => {
+    seed();
+    const st = useAppStore.getState();
+    const positionsBefore = st.positions;
+    const pos = st.positions['public.a'];
+    st.commitCanvasCommand({
+      label: 'move table',
+      tables: [{ id: 'public.a', before: pos, after: { ...pos } }],
+      notes: [],
+    });
+    expect(useAppStore.getState().positions).toBe(positionsBefore); // not even a new object
+    expect(getCanvasStack().canUndo()).toBe(false);
+  });
+
+  it('a multi-entry command undoes atomically (tables and notes together)', () => {
+    seed();
+    useAppStore.setState({ notePositions: { todo: { x: 10, y: 10 } } });
+    const a = useAppStore.getState().positions['public.a'];
+    const b = useAppStore.getState().positions['public.b'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move tables',
+      tables: [
+        { id: 'public.a', before: a, after: { x: a.x + 50, y: a.y } },
+        { id: 'public.b', before: b, after: { x: b.x + 50, y: b.y } },
+      ],
+      notes: [{ id: 'todo', before: { x: 10, y: 10 }, after: { x: 60, y: 10 } }],
+    });
+    useAppStore.getState().undoCanvas();
+    const st = useAppStore.getState();
+    expect(st.positions['public.a']).toEqual(a);
+    expect(st.positions['public.b']).toEqual(b);
+    expect(st.notePositions.todo).toEqual({ x: 10, y: 10 });
+  });
+
+  it('undo after a later edit deleted the table does not resurrect its position', () => {
+    seed();
+    const b = useAppStore.getState().positions['public.b'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table',
+      tables: [{ id: 'public.b', before: b, after: { x: 700, y: 700 } }],
+      notes: [],
+    });
+    const src2 = 'Table a { id int }'; // table b deleted by a later edit
+    useAppStore.getState().applyParse(parseDbml(src2), src2);
+    useAppStore.getState().undoCanvas(); // consumes the entry; must not crash or re-insert public.b
+    expect(useAppStore.getState().positions['public.b']).toBeUndefined();
+  });
+
+  it('a new command clears redo', () => {
+    seed();
+    const a = useAppStore.getState().positions['public.a'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table', tables: [{ id: 'public.a', before: a, after: { x: 1, y: 1 } }], notes: [],
+    });
+    useAppStore.getState().undoCanvas();
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table', tables: [{ id: 'public.a', before: a, after: { x: 2, y: 2 } }], notes: [],
+    });
+    expect(getCanvasStack().canRedo()).toBe(false);
+  });
+
+  it('loadDiagram starts a fresh stack', () => {
+    seed();
+    const a = useAppStore.getState().positions['public.a'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table', tables: [{ id: 'public.a', before: a, after: { x: 5, y: 5 } }], notes: [],
+    });
+    useAppStore.getState().loadDiagram({
+      id: 'd3', name: 'Y', dbml: 'Table y { id int }',
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(getCanvasStack().canUndo()).toBe(false);
   });
 });
