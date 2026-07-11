@@ -37,7 +37,8 @@ function isFiniteNumber(v: unknown): v is number {
 }
 
 /** Validate an untrusted project file. Rebuilds sanitized objects (unknown
- *  keys dropped) — this is a trust boundary. Errors are user-readable. */
+ *  keys dropped, reserved layout keys like "__proto__" rejected) — this is a
+ *  trust boundary. Errors are user-readable. */
 export function parseProject(text: string): ProjectParseResult {
   let raw: unknown;
   try {
@@ -60,6 +61,9 @@ export function parseProject(text: string): ProjectParseResult {
   }
   const layout: Record<string, TablePosition> = {};
   for (const [k, v] of Object.entries(o.layout as Record<string, unknown>)) {
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+      return { ok: false, error: `Project file layout entry "${k}" is not allowed.` };
+    }
     const p = v as { x?: unknown; y?: unknown } | null;
     if (!p || !isFiniteNumber(p.x) || !isFiniteNumber(p.y)) {
       return { ok: false, error: `Project file layout entry "${k}" must have numeric x/y.` };

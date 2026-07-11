@@ -69,6 +69,17 @@ describe('serializeProject / parseProject', () => {
     expect(r.error).toContain('public.a');
   });
 
+  it('rejects a "__proto__" layout key instead of hijacking the prototype', () => {
+    const r = parseProject(
+      '{"version":1,"name":"Shop","dbml":"Table a { id int }","layout":{"__proto__":{"x":111,"y":222},"public.a":{"x":1,"y":2}},"viewport":{"x":0,"y":0,"zoom":1}}',
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toContain('not allowed');
+    // pin the no-global-pollution property
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+  });
+
   it('rejects a bad viewport (non-numeric or non-positive zoom)', () => {
     const raw = JSON.parse(serializeProject(input)) as Record<string, unknown>;
     raw.viewport = { x: 0, y: 0, zoom: 0 };
