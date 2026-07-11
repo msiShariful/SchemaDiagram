@@ -15,6 +15,7 @@ export function App() {
   const errors = useAppStore((s) => s.errors);
   const tableCount = useAppStore((s) => s.schema.tables.length);
   const storageUnavailable = useAppStore((s) => s.storageUnavailable);
+  const parseCurrent = useAppStore((s) => s.parsedSource === s.source);
 
   return (
     <div className="app-shell">
@@ -23,7 +24,7 @@ export function App() {
         <DiagramManager />
         <button
           className="format-button"
-          disabled={stale || errors.length > 0}
+          disabled={stale || errors.length > 0 || !parseCurrent}
           title="Format document (Ctrl/Cmd-Shift-F)"
           onClick={() => applyFormat()}
         >

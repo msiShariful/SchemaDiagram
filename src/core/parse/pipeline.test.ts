@@ -88,4 +88,15 @@ describe('createParsePipeline', () => {
     expect((onResult.mock.calls[0][0] as ParseResult & { ok: true }).schema.notes[0].id).toBe('B');
     p.dispose();
   });
+
+  it('passes the parsed source alongside the result', async () => {
+    const parse = vi.fn(async (s: string) => okResult(s));
+    const onResult = vi.fn();
+    const p = createParsePipeline({ parse, onResult, debounceMs: 10 });
+    p.push('abc');
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.runAllTimersAsync();
+    expect(onResult).toHaveBeenCalledWith(okResult('abc'), 'abc');
+    p.dispose();
+  });
 });

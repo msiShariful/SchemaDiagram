@@ -49,6 +49,10 @@ export function applyFormat(): boolean {
   const s = useAppStore.getState();
   if (s.stale || s.errors.length > 0) return false;
   const current = view.state.doc.toString();
+  // `stale` only says the LAST parse failed — a parse of NEWER text may still
+  // be inside the 300 ms debounce. Formatting is allowed only when the last
+  // successful parse was of exactly this text.
+  if (s.parsedSource !== current) return false;
   const formatted = formatDbmlSource(current);
   if (formatted !== current) {
     view.dispatch({ changes: { from: 0, to: current.length, insert: formatted } });

@@ -21,8 +21,9 @@ interface AppState {
   hoveredTableId: string | null;
   editorFocusTableId: string | null;
   storageUnavailable: boolean;
+  parsedSource: string | null;
   setSource(source: string): void;
-  applyParse(result: ParseResult): void;
+  applyParse(result: ParseResult, source: string): void;
   moveTable(id: string, pos: TablePosition): void;
   setViewport(v: Viewport): void;
   setHoveredTable(id: string | null): void;
@@ -45,10 +46,11 @@ export const useAppStore = create<AppState>()(
     hoveredTableId: null,
     editorFocusTableId: null,
     storageUnavailable: false,
+    parsedSource: null,
 
     setSource: (source) => set({ source }),
 
-    applyParse: (result) => {
+    applyParse: (result, source) => {
       if (!result.ok) {
         set({ errors: result.errors, stale: true });
         return;
@@ -56,7 +58,13 @@ export const useAppStore = create<AppState>()(
       const { schema: prev, positions } = get();
       const kept = reconcilePositions(prev, result.schema, positions);
       const placed = placeNewTables(result.schema, kept);
-      set({ schema: result.schema, positions: { ...kept, ...placed }, errors: [], stale: false });
+      set({
+        schema: result.schema,
+        positions: { ...kept, ...placed },
+        errors: [],
+        stale: false,
+        parsedSource: source,
+      });
     },
 
     moveTable: (id, pos) => set((s) => ({ positions: { ...s.positions, [id]: pos } })),
@@ -78,6 +86,7 @@ export const useAppStore = create<AppState>()(
         stale: true, // until the parse pipeline catches up
         hoveredTableId: null,
         editorFocusTableId: null,
+        parsedSource: null,
       }),
   })),
 );

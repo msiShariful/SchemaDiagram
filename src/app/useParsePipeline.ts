@@ -22,7 +22,7 @@ export function useParsePipeline(): void {
     const adapter = createWorkerParse();
     const pipeline = createParsePipeline({
       parse: adapter.parse,
-      onResult: (r) => useAppStore.getState().applyParse(r),
+      onResult: (r, source) => useAppStore.getState().applyParse(r, source),
       debounceMs: 300,
     });
     pipeline.push(useAppStore.getState().source);

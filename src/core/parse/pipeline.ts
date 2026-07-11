@@ -7,7 +7,7 @@ export interface ParsePipeline {
 
 export function createParsePipeline(opts: {
   parse: (source: string) => Promise<ParseResult>;
-  onResult: (r: ParseResult) => void;
+  onResult: (r: ParseResult, source: string) => void;
   debounceMs?: number;
 }): ParsePipeline {
   const debounceMs = opts.debounceMs ?? 300;
@@ -30,7 +30,7 @@ export function createParsePipeline(opts: {
       const mySeq = ++seq;
       timer = setTimeout(() => {
         void opts.parse(source).then((result) => {
-          if (!disposed && mySeq === seq) opts.onResult(result);
+          if (!disposed && mySeq === seq) opts.onResult(result, source);
         });
       }, debounceMs);
     },
