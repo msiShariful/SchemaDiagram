@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TABLE_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, tableHeight, fieldRowY, getTableRect } from './geometry';
+import { TABLE_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, tableHeight, fieldRowY, getTableRect, unionRects, expandRect } from './geometry';
 import type { Table } from './types';
 
 const table = (fieldCount: number): Table => ({
@@ -22,5 +22,20 @@ describe('geometry', () => {
   });
   it('builds table rect from position', () => {
     expect(getTableRect(table(2), { x: 10, y: 20 })).toEqual({ x: 10, y: 20, w: TABLE_WIDTH, h: tableHeight(2) });
+  });
+});
+
+describe('unionRects / expandRect', () => {
+  it('unions rects into a bounding box', () => {
+    expect(unionRects([
+      { x: 0, y: 0, w: 10, h: 10 },
+      { x: 40, y: -5, w: 10, h: 10 },
+    ])).toEqual({ x: 0, y: -5, w: 50, h: 15 });
+  });
+  it('returns null for no rects', () => {
+    expect(unionRects([])).toBeNull();
+  });
+  it('expands a rect by a margin on all sides', () => {
+    expect(expandRect({ x: 10, y: 20, w: 30, h: 40 }, 5)).toEqual({ x: 5, y: 15, w: 40, h: 50 });
   });
 });
