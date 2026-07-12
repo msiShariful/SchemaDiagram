@@ -8,6 +8,11 @@ import { usePersistence } from './usePersistence';
 import { SplitPane } from './SplitPane';
 import { ProblemsPanel } from './ProblemsPanel';
 import { applyFormat } from '../editor/editorNav';
+import { ExportMenu } from './ExportMenu';
+import { HistoryPanel } from './HistoryPanel';
+import { ImportDialog } from './ImportDialog';
+import { downloadText } from './export/download';
+import { safeFilename } from './export/exportCss';
 
 const THEME_KEY = 'dbdraft.theme';
 type Theme = 'light' | 'dark';
@@ -42,12 +47,14 @@ export function App() {
   const tableCount = useAppStore((s) => s.schema.tables.length);
   const storageUnavailable = useAppStore((s) => s.storageUnavailable);
   const parseCurrent = useAppStore((s) => s.parsedSource === s.source);
+  const [importOpen, setImportOpen] = useState(false);
 
   return (
     <div className="app-shell">
       <header className="toolbar">
         <span className="brand">DBDraft</span>
         <DiagramManager />
+        <button onClick={() => setImportOpen(true)}>Import</button>
         <button
           className="format-button"
           disabled={stale || errors.length > 0 || !parseCurrent}
@@ -56,6 +63,8 @@ export function App() {
         >
           Format
         </button>
+        <ExportMenu />
+        <HistoryPanel />
         <button
           className="theme-button"
           title="Toggle dark/light theme"
@@ -67,7 +76,16 @@ export function App() {
       </header>
       {storageUnavailable && (
         <div className="banner-warning">
-          Browser storage is unavailable — your work is NOT being saved. Keep this tab open.
+          <span>Browser storage is unavailable — your work is NOT being saved. Keep this tab open.</span>
+          <button
+            className="banner-action"
+            onClick={() => {
+              const s = useAppStore.getState();
+              downloadText(s.source, `${safeFilename(s.diagramName)}.dbml`);
+            }}
+          >
+            Download your work (.dbml)
+          </button>
         </div>
       )}
       <SplitPane left={<DbmlEditor />} right={<DiagramCanvas />} />
@@ -78,6 +96,7 @@ export function App() {
         </span>
         <span className="status-dim">{tableCount} tables</span>
       </footer>
+      {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
     </div>
   );
 }

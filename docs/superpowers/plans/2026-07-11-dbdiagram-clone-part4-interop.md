@@ -316,7 +316,7 @@ npx vitest run && git add src/core/convert src/core/parse/errors.ts src/core/par
   - `interface ProjectFile { version: 1; name: string; dbml: string; layout: Record<string, TablePosition>; viewport: Viewport }`
   - `type ProjectParseResult = { ok: true; project: ProjectFile } | { ok: false; error: string }`
   - `serializeProject(p: { name: string; dbml: string; positions: Record<string, TablePosition>; viewport: Viewport }): string`
-  - `parseProject(text: string): ProjectParseResult` — validates shape, rebuilds sanitized objects (unknown keys dropped), readable error messages.
+  - `parseProject(text: string): ProjectParseResult` — validates shape, rebuilds sanitized objects (unknown keys dropped, reserved layout keys like `__proto__` rejected), readable error messages.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -393,6 +393,17 @@ describe('serializeProject / parseProject', () => {
     expect(r.error).toContain('public.a');
   });
 
+  it('rejects a "__proto__" layout key instead of hijacking the prototype', () => {
+    const r = parseProject(
+      '{"version":1,"name":"Shop","dbml":"Table a { id int }","layout":{"__proto__":{"x":111,"y":222},"public.a":{"x":1,"y":2}},"viewport":{"x":0,"y":0,"zoom":1}}',
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toContain('not allowed');
+    // pin the no-global-pollution property
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+  });
+
   it('rejects a bad viewport (non-numeric or non-positive zoom)', () => {
     const raw = JSON.parse(serializeProject(input)) as Record<string, unknown>;
     raw.viewport = { x: 0, y: 0, zoom: 0 };
@@ -451,7 +462,8 @@ function isFiniteNumber(v: unknown): v is number {
 }
 
 /** Validate an untrusted project file. Rebuilds sanitized objects (unknown
- *  keys dropped) — this is a trust boundary. Errors are user-readable. */
+ *  keys dropped, reserved layout keys like "__proto__" rejected) — this is a
+ *  trust boundary. Errors are user-readable. */
 export function parseProject(text: string): ProjectParseResult {
   let raw: unknown;
   try {
@@ -474,6 +486,9 @@ export function parseProject(text: string): ProjectParseResult {
   }
   const layout: Record<string, TablePosition> = {};
   for (const [k, v] of Object.entries(o.layout as Record<string, unknown>)) {
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+      return { ok: false, error: `Project file layout entry "${k}" is not allowed.` };
+    }
     const p = v as { x?: unknown; y?: unknown } | null;
     if (!p || !isFiniteNumber(p.x) || !isFiniteNumber(p.y)) {
       return { ok: false, error: `Project file layout entry "${k}" must have numeric x/y.` };
@@ -499,7 +514,7 @@ export function parseProject(text: string): ProjectParseResult {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run src/core/convert` — Expected: PASS (8 new tests + Task 1's).
+Run: `npx vitest run src/core/convert` — Expected: PASS (9 new tests + Task 1's).
 
 - [ ] **Step 5: Commit**
 
@@ -1621,7 +1636,15 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     if (!f) return;
     setErrors([]);
     setFileName(f.name);
-    setText(await f.text());
+    try {
+      setText(await f.text());
+    } catch (e) {
+      // File.text() can reject (file moved/deleted after picking, permission
+      // revoked, decode failure) — surface it in the dialog instead of the
+      // void'd promise swallowing it. No store/repo writes on this path.
+      setErrors([{ message: `Could not read file: ${e instanceof Error ? e.message : String(e)}`, line: 1, column: 1 }]);
+      return;
+    }
     if (/\.dbml$/i.test(f.name)) setKind('dbml');
     else if (/\.json$/i.test(f.name)) setKind('project');
   };
@@ -1786,9 +1809,17 @@ export function HistoryPanel() {
   const diagramId = useAppStore((s) => s.diagramId);
   const [open, setOpen] = useState(false);
   const [snaps, setSnaps] = useState<DiagramSnapshot[]>([]);
+  const [busy, setBusy] = useState(false);
 
   const refresh = (id: string) => {
-    void listSnapshots(id).then(setSnaps).catch(() => setSnaps([]));
+    // A fetch armed for a previous diagram can resolve AFTER the current
+    // one (switch with the panel open) — drop any settlement whose id no
+    // longer matches the live store instead of clobbering the list.
+    const fresh = () => useAppStore.getState().diagramId === id;
+    void listSnapshots(id).then(
+      (rows) => { if (fresh()) setSnaps(rows); },
+      () => { if (fresh()) setSnaps([]); },
+    );
   };
 
   useEffect(() => {
@@ -1805,7 +1836,10 @@ export function HistoryPanel() {
   const restore = (snap: DiagramSnapshot) => {
     // restoreSnapshot keeps the diagram id, so refreshing with the captured
     // id is safe; the pre-restore checkpoint shows up at the top of the list.
-    void restoreSnapshot(snap).then(() => refresh(snap.diagramId));
+    setBusy(true);
+    void restoreSnapshot(snap)
+      .then(() => refresh(snap.diagramId))
+      .finally(() => setBusy(false));
   };
 
   return (
@@ -1824,7 +1858,7 @@ export function HistoryPanel() {
                 <li key={s.id}>
                   <span className="when">{new Date(s.takenAt).toLocaleString()}</span>
                   <span className="history-meta">{s.dbml.length} chars</span>
-                  <button onClick={() => restore(s)}>restore</button>
+                  <button disabled={busy} onClick={() => restore(s)}>restore</button>
                 </li>
               ))}
             </ul>

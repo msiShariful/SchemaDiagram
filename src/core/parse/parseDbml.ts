@@ -2,8 +2,10 @@ import { Parser } from '@dbml/core';
 import type {
   Schema, Table, Field, Ref, RefEndpoint, EnumDef, Relation, TableGroup, StickyNote,
 } from '../model/types';
+import type { ParseError } from './errors';
+import { normalizeParseErrors } from './errors';
 
-export interface ParseError { message: string; line: number; column: number; }
+export type { ParseError } from './errors';
 export type ParseResult = { ok: true; schema: Schema } | { ok: false; errors: ParseError[] };
 
 export function parseDbml(source: string): ParseResult {
@@ -13,7 +15,7 @@ export function parseDbml(source: string): ParseResult {
     const db = new Parser().parse(source, 'dbmlv2');
     return { ok: true, schema: normalizeDatabase(db) };
   } catch (e) {
-    return { ok: false, errors: normalizeErrors(e) };
+    return { ok: false, errors: normalizeParseErrors(e) };
   }
 }
 
@@ -103,16 +105,4 @@ function normalizeDatabase(db: any): Schema {
   }
 
   return { tables, refs, enums, groups, notes: [...noteById.values()] };
-}
-
-function normalizeErrors(e: unknown): ParseError[] {
-  const err = e as { diags?: Array<{ message?: string; location?: { start?: { line?: number; column?: number } } }>; message?: string };
-  if (Array.isArray(err?.diags) && err.diags.length > 0) {
-    return err.diags.map((d) => ({
-      message: d.message ?? 'Syntax error',
-      line: d.location?.start?.line ?? 1,
-      column: d.location?.start?.column ?? 1,
-    }));
-  }
-  return [{ message: err?.message ?? 'Unknown parse error', line: 1, column: 1 }];
 }
