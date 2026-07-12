@@ -13,6 +13,7 @@ import { lodLevel } from './lod';
 import { visibleWorldRect } from './culling';
 import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
 import { revealTable } from '../editor/editorNav';
+import { runElkLayout } from '../core/layout/elkLayout';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 
@@ -45,6 +46,7 @@ export function DiagramCanvas() {
   const marqueeState = useRef<{ start: Point } | null>(null);
   const spaceDown = useRef(false);
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
+  const [layoutBusy, setLayoutBusy] = useState(false);
 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
@@ -399,6 +401,28 @@ export function DiagramCanvas() {
     useAppStore.getState().setViewport(fitViewport(rects, rect.width, rect.height));
   };
 
+  const autoLayout = async () => {
+    const { schema } = useAppStore.getState();
+    if (schema.tables.length === 0 || layoutBusy) return;
+    setLayoutBusy(true);
+    try {
+      const next = await runElkLayout(schema);
+      const st = useAppStore.getState();
+      if (st.schema !== schema) return; // schema changed mid-layout: stale result, discard
+      const tables = Object.keys(next).map((id) => ({
+        id,
+        before: st.positions[id] ?? next[id], // unknown before → zero delta → pruned
+        after: next[id],
+      }));
+      st.commitCanvasCommand({ label: 'auto-layout', tables, notes: [] });
+      fit();
+    } catch {
+      // layout unavailable (worker + fallback both failed) — positions untouched
+    } finally {
+      setLayoutBusy(false);
+    }
+  };
+
   return (
     <div className="canvas-wrap">
       <svg
@@ -454,6 +478,9 @@ export function DiagramCanvas() {
       </svg>
       <MiniMap ref={minimapRef} viewSize={size} onNavigate={handleMinimapNav} />
       <div className="zoom-controls">
+        <button onClick={() => void autoLayout()} disabled={layoutBusy} title="Auto-layout (ELK layered)">
+          auto
+        </button>
         <button onClick={() => zoomBy(1.2)}>+</button>
         <button onClick={() => zoomBy(1 / 1.2)}>−</button>
         <button onClick={fit}>fit</button>

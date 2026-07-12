@@ -1,0 +1,41 @@
+import { describe, it, expect } from 'vitest';
+import { buildElkGraph, elkResultToPositions, ELK_ORIGIN, ELK_LAYOUT_OPTIONS } from './elkGraph';
+import { parseDbml } from '../../core/parse/parseDbml';
+import type { Schema } from '../model/types';
+
+const schemaOf = (src: string): Schema => {
+  const r = parseDbml(src);
+  if (!r.ok) throw new Error('fixture parse failed');
+  return r.schema;
+};
+
+describe('buildElkGraph', () => {
+  it('maps tables to sized nodes and refs to edges', () => {
+    const g = buildElkGraph(schemaOf('Table a { id int }\nTable b { id int\n a_id int }\nRef: b.a_id > a.id'));
+    expect(g.layoutOptions).toBe(ELK_LAYOUT_OPTIONS);
+    expect(g.children).toEqual([
+      { id: 'public.a', width: 220, height: 60 },
+      { id: 'public.b', width: 220, height: 88 },
+    ]);
+    expect(g.edges).toHaveLength(1);
+    expect(g.edges[0].sources).toEqual(['public.b']);
+    expect(g.edges[0].targets).toEqual(['public.a']);
+  });
+  it('skips self-references', () => {
+    const g = buildElkGraph(schemaOf('Table c { id int\n parent_id int }\nRef: c.parent_id > c.id'));
+    expect(g.edges).toEqual([]);
+  });
+  it('produces an empty graph for an empty schema', () => {
+    const g = buildElkGraph({ tables: [], refs: [], enums: [], groups: [], notes: [] });
+    expect(g.children).toEqual([]);
+    expect(g.edges).toEqual([]);
+  });
+});
+
+describe('elkResultToPositions', () => {
+  it('offsets ELK coordinates by the origin', () => {
+    expect(elkResultToPositions({ children: [{ id: 't', x: 10, y: 20 }] })).toEqual({
+      t: { x: ELK_ORIGIN + 10, y: ELK_ORIGIN + 20 },
+    });
+  });
+});
