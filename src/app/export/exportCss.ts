@@ -19,6 +19,13 @@ export const EXPORT_CSS = [
   '.row-line { stroke: var(--border); }',
   '.edge path { fill: none; stroke: var(--edge); stroke-width: 1.5; }',
   '.edge-label { font-size: 10px; fill: var(--text-dim); }',
+  // Plan 3 canvas elements — LOD box fallback, groups, sticky notes.
+  '.table-box { fill: var(--table-header); stroke: var(--border); }',
+  '.group-rect { fill-opacity: 0.05; stroke-width: 1.5; stroke-dasharray: 6 4; }',
+  '.group-title { font-size: 12px; font-weight: 600; fill: var(--text); }',
+  '.note-body { fill: var(--note-bg); stroke: var(--note-border); }',
+  '.note-title { font-size: 11px; font-weight: 600; fill: var(--text); }',
+  '.note-content { font-size: 11px; color: var(--text); font-family: system-ui, sans-serif; white-space: pre-wrap; overflow: hidden; height: 100%; }',
 ].join('\n');
 
 /** Replace every `var(--name)` / `var(--name, fallback)` with a concrete

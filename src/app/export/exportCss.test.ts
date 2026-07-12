@@ -6,6 +6,8 @@ describe('EXPORT_CSS', () => {
     for (const sel of [
       '.table-body', '.table-header', '.table-title', '.field-name',
       '.field-type', '.row-line', '.edge path', '.edge-label',
+      '.table-box', '.group-rect', '.group-title',
+      '.note-body', '.note-title', '.note-content',
     ]) {
       expect(EXPORT_CSS).toContain(sel);
     }

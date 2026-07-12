@@ -1,6 +1,7 @@
 import { useAppStore } from '../store';
-import { getTableRect, unionRects, expandRect } from '../../core/model/geometry';
+import { expandRect } from '../../core/model/geometry';
 import { EXPORT_CSS, resolveCssVars } from './exportCss';
+import { computeExportBounds } from './exportBounds';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -15,21 +16,26 @@ export interface BuiltSvg {
 }
 
 /** Serialize the live canvas scene into a standalone SVG document string.
- *  - full-diagram bounds (union of all table rects + margin), NOT the viewport
+ *  - full-diagram bounds (union of all table/note/group rects + margin, via
+ *    computeExportBounds), NOT the viewport
  *  - the scene <g>'s pan/zoom transform is stripped from the clone
  *  - styles inlined via an embedded <style> block, with every CSS variable
  *    resolved against the live document — theme-correct once Plan 3 lands
  *    CSS-variable theming
  *  - fonts are the system stack; nothing to embed
- *  Returns null when there is nothing to export (no canvas / no tables). */
+ *  Returns null when there is nothing to export (no canvas / nothing positioned). */
 export function buildDiagramSvg(): BuiltSvg | null {
   const live = document.querySelector('svg.diagram-canvas');
   const scene = live?.firstElementChild ?? null; // the single scene <g>
-  const { schema, positions } = useAppStore.getState();
-  const rects = schema.tables
-    .filter((t) => positions[t.id])
-    .map((t) => getTableRect(t, positions[t.id]));
-  const bounds = unionRects(rects);
+  // ponytail: the clone below carries whatever LOD the live canvas is
+  // currently rendered at (TableNode collapses to `.table-box`, no field
+  // text, below 15% zoom — see canvas/lod.ts). Forcing a full-detail
+  // re-render before serializing would mean driving DiagramCanvas's React
+  // tree through an off-screen zoom, which is a real feature, not a CSS fix
+  // — deferred. EXPORT_CSS styles `.table-box` so that ceiling degrades to
+  // "plain colored boxes" rather than invisible/unstyled rects.
+  const { schema, positions, notePositions } = useAppStore.getState();
+  const bounds = computeExportBounds(schema, positions, notePositions);
   if (!scene || !bounds) return null;
   const b = expandRect(bounds, EXPORT_MARGIN);
 
