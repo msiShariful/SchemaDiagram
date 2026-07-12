@@ -12,7 +12,12 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
-const BUDGET_BYTES = Number(process.env.BUNDLE_BUDGET ?? 210 * 1024);
+const raw = process.env.BUNDLE_BUDGET;
+const BUDGET_BYTES = raw === undefined ? 210 * 1024 : Number(raw);
+if (Number.isNaN(BUDGET_BYTES)) {
+  console.error('check-bundle FAILED: BUNDLE_BUDGET is not a number: ' + raw);
+  process.exit(1);
+}
 // Markers that exist ONLY in lazy chunks: elk.bundled.js ships ELK's Java
 // option ids ('org.eclipse.elk…'); the @dbml/core chunk (reachable only via
 // dynamic import of parseDbml.ts) contains the 'dbmlv2' format literal.
@@ -25,13 +30,21 @@ const FORBIDDEN = ['org.eclipse.elk', 'dbmlv2'];
 
 execSync('npm run build', { stdio: 'inherit' });
 
-const html = readFileSync('dist/index.html', 'utf8');
+let html;
+try {
+  html = readFileSync('dist/index.html', 'utf8');
+} catch {
+  console.error('check-bundle FAILED: dist/index.html missing — did the build produce output?');
+  process.exit(1);
+}
 const entry = html.match(/assets\/index-[^"]+\.js/)?.[0];
 if (!entry) {
   console.error('check-bundle: could not find the entry chunk in dist/index.html');
   process.exit(1);
 }
 const chunk = readFileSync(`dist/${entry}`);
+// Node's zlib gzips ~1% smaller than the size vite build prints for the same
+// file (different encoder settings); this script's number is the enforced metric.
 const gzBytes = gzipSync(chunk).length;
 
 const failures = [];
