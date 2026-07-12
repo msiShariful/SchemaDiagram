@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createWorkerParse, PARSER_UNAVAILABLE_MESSAGE } from './workerParse';
+import { createWorkerParse, PARSER_UNAVAILABLE_MESSAGE, WORKER_CRASHED_MESSAGE } from './workerParse';
 import type { ParseResult } from './parseDbml';
 
 describe('createWorkerParse (fallback path, no Worker global)', () => {
@@ -63,51 +63,72 @@ describe('createWorkerParse (worker path, fake Worker)', () => {
     return { adapter, instance };
   };
 
+  const okResult: ParseResult = {
+    ok: true,
+    schema: { tables: [], refs: [], enums: [], groups: [], notes: [] },
+  };
+
   it('happy path: posts to the worker and resolves with the worker-provided result', async () => {
     const { adapter, instance } = spawn();
     const promise = adapter.parse('Table a { id int }');
     expect(instance.posted).toEqual([{ id: 0, source: 'Table a { id int }' }]);
-
-    const workerResult: ParseResult = {
-      ok: true,
-      schema: {
-        tables: [],
-        refs: [],
-        enums: [],
-        groups: [],
-        notes: [{ id: 'from-worker', name: 'from-worker', content: '' }],
-      },
-    };
-    instance.onmessage?.({ data: { id: 0, result: workerResult } });
-
-    await expect(promise).resolves.toBe(workerResult);
+    instance.onmessage?.({ data: { id: 0, result: okResult } });
+    await expect(promise).resolves.toBe(okResult);
     expect(instance.terminateCount).toBe(0);
   });
 
-  it('onerror settles all pending promises in-thread and later calls skip postMessage', async () => {
+  it('a crash restarts the worker and re-parses the in-flight source once (spec §9)', async () => {
+    const { adapter, instance } = spawn();
+    const p = adapter.parse('Table a { id int }');
+    instance.onerror?.(); // crash #1
+    expect(instance.terminateCount).toBe(1);
+    expect(FakeWorker.instances).toHaveLength(2); // restarted
+    const second = FakeWorker.instances[1];
+    expect(second.posted).toEqual([{ id: 1, source: 'Table a { id int }' }]); // re-posted
+    second.onmessage?.({ data: { id: 1, result: okResult } });
+    await expect(p).resolves.toBe(okResult);
+  });
+
+  it('two consecutive crashes on identical input resolve with the inline crash error, nothing auto-retried', async () => {
+    const { adapter, instance } = spawn();
+    const p = adapter.parse('Table a { id int }');
+    instance.onerror?.(); // crash #1 → restart + re-post
+    FakeWorker.instances[1].onerror?.(); // crash #2, same source → report
+    const r = await p;
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors[0].message).toBe(WORKER_CRASHED_MESSAGE);
+    // a THIRD worker exists to serve future (different) input,
+    // but the crashed source was NOT auto re-posted — no retry loop.
+    expect(FakeWorker.instances).toHaveLength(3);
+    expect(FakeWorker.instances[2].posted).toHaveLength(0);
+    // future parses go to the fresh worker
+    const p2 = adapter.parse('Table b { id int }');
+    expect(FakeWorker.instances[2].posted).toEqual([{ id: 2, source: 'Table b { id int }' }]);
+    FakeWorker.instances[2].onmessage?.({ data: { id: 2, result: okResult } });
+    await expect(p2).resolves.toBe(okResult);
+  });
+
+  it('a successful response breaks the crash chain: the same source crashing later restarts again', async () => {
     const { adapter, instance } = spawn();
     const p1 = adapter.parse('Table a { id int }');
-    const p2 = adapter.parse('Table b { id int }');
-    expect(instance.posted).toHaveLength(2);
-
-    instance.onerror?.();
-
-    await expect(p1).resolves.toMatchObject({ ok: true });
-    await expect(p2).resolves.toMatchObject({ ok: true });
-    expect(instance.terminateCount).toBe(1);
-
-    // Adapter is now dead: subsequent calls resolve in-thread without touching the worker.
-    await expect(adapter.parse('Table c { id int }')).resolves.toMatchObject({ ok: true });
-    expect(instance.posted).toHaveLength(2);
+    instance.onerror?.(); // crash #1 → restart, re-post as id 1
+    const w2 = FakeWorker.instances[1];
+    w2.onmessage?.({ data: { id: 1, result: okResult } }); // success resets the ledger
+    await p1;
+    const p2 = adapter.parse('Table a { id int }'); // id 2, same text as the old crash
+    w2.onerror?.(); // crash again — but the chain was broken
+    const w3 = FakeWorker.instances[2];
+    expect(w3.posted).toEqual([{ id: 3, source: 'Table a { id int }' }]); // restart, not report
+    w3.onmessage?.({ data: { id: 3, result: okResult } });
+    await expect(p2).resolves.toBe(okResult);
   });
 
   it('postMessage throwing settles that call via fallback and marks the adapter dead', async () => {
     const { adapter, instance } = spawn();
     instance.throwOnPost = true;
-
     await expect(adapter.parse('Table a { id int }')).resolves.toMatchObject({ ok: true });
     expect(instance.terminateCount).toBe(1);
-
     // Even with a now-working postMessage, the dead adapter never posts again.
     instance.throwOnPost = false;
     await expect(adapter.parse('Table b { id int }')).resolves.toMatchObject({ ok: true });
@@ -118,23 +139,24 @@ describe('createWorkerParse (worker path, fake Worker)', () => {
     const { adapter, instance } = spawn();
     const inFlight = adapter.parse('Table a { id int }');
     expect(instance.posted).toHaveLength(1);
-
     adapter.dispose();
-
     await expect(inFlight).resolves.toMatchObject({ ok: true });
     expect(instance.terminateCount).toBe(1);
   });
 
-  it('shutdown is idempotent: double dispose / dispose after onerror terminate at most once', () => {
+  it('shutdown is idempotent: double dispose terminates the live worker at most once', () => {
     const first = spawn();
     first.adapter.dispose();
     first.adapter.dispose();
     expect(first.instance.terminateCount).toBe(1);
 
+    // crash → the FIRST worker is terminated by the restart; dispose then
+    // terminates the SECOND. Neither is ever terminated twice.
     const second = spawn();
     second.instance.onerror?.();
     second.adapter.dispose();
     expect(second.instance.terminateCount).toBe(1);
+    expect(FakeWorker.instances[FakeWorker.instances.length - 1].terminateCount).toBe(1);
   });
 });
 
