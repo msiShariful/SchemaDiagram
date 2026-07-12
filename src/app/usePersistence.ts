@@ -31,24 +31,28 @@ function currentRecord(): DiagramRecord | null {
   };
 }
 
-// Snapshot policy (History): every successful diagram write below produces
-// a snapshot CANDIDATE. It is kept only when (a) the parse state LOOKS
-// clean (`!stale && errors.length === 0`) and (b) the text differs from the
-// newest stored snapshot. Note the gate is approximate: stale/errors
-// reflect the last COMPLETED parse, so a slow worker parse still in flight
-// when the 1 s autosave fires can let a not-yet-validated text through —
-// same race class as the applyFormat stale-check ledger item; move to a
-// `parsedSource === dbml` gate once a parsedSource field exists.
-// Layout-only saves (drag/pan) and the keystroke stream (1 s debounce)
-// never snapshot. Runs strictly AFTER putDiagram has succeeded and swallows
+// Shared by maybeSnapshot (autosave) and restoreSnapshot (pre-restore
+// checkpoint): write a snapshot for `rec` unless the newest stored snapshot
+// for its diagram already matches it. `compareLayout` controls what
+// "matches" means:
+//  - false (autosave): text-only, so a layout-only save (drag/pan) never
+//    produces a new History entry — snapshots are text milestones, not a
+//    pixel-by-pixel log.
+//  - true (pre-restore checkpoint): text AND positions/viewport, because a
+//    restore can discard layout that drifted (drag/pan) since the newest
+//    snapshot even when the text hasn't changed — dedupe-by-text-alone
+//    would then leave nothing to recover that layout from.
+// Runs strictly AFTER the caller's diagram write has succeeded and swallows
 // every failure: history is best-effort and must never break, abort, or
-// reorder the diagram save itself.
-async function maybeSnapshot(rec: DiagramRecord): Promise<void> {
-  const s = useAppStore.getState();
-  if (s.stale || s.errors.length > 0) return;
+// reorder the write it follows.
+async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Promise<void> {
   try {
     const newest = (await listSnapshots(rec.id))[0];
-    if (newest && newest.dbml === rec.dbml) return;
+    const sameLayout = !compareLayout || (
+      JSON.stringify(newest?.positions) === JSON.stringify(rec.positions) &&
+      JSON.stringify(newest?.viewport) === JSON.stringify(rec.viewport)
+    );
+    if (newest && newest.dbml === rec.dbml && sameLayout) return;
     await putSnapshot({
       id: nanoid(),
       diagramId: rec.id,
@@ -62,6 +66,22 @@ async function maybeSnapshot(rec: DiagramRecord): Promise<void> {
     // best-effort: the diagram row itself was already saved above; a failed
     // snapshot write must not surface or flip the storage banner.
   }
+}
+
+// Snapshot policy (History): every successful diagram write below produces
+// a snapshot CANDIDATE. It is kept only when (a) the parse state LOOKS
+// clean (`!stale && errors.length === 0`) and (b) the text differs from the
+// newest stored snapshot. Note the gate is approximate: stale/errors
+// reflect the last COMPLETED parse, so a slow worker parse still in flight
+// when the 1 s autosave fires can let a not-yet-validated text through —
+// same race class as the applyFormat stale-check ledger item; move to a
+// `parsedSource === dbml` gate once a parsedSource field exists.
+// Layout-only saves (drag/pan) and the keystroke stream (1 s debounce)
+// never snapshot (text-only dedupe — see snapshotIfChanged).
+async function maybeSnapshot(rec: DiagramRecord): Promise<void> {
+  const s = useAppStore.getState();
+  if (s.stale || s.errors.length > 0) return;
+  await snapshotIfChanged(rec, false);
 }
 
 async function saveCurrent(): Promise<void> {
@@ -208,29 +228,27 @@ export async function importDiagram(imp: ImportedDiagram): Promise<void> {
 
 // Restore a snapshot into the CURRENT diagram (same id). Non-destructive:
 // the pre-restore state is checkpointed first (deduped against the newest
-// snapshot), so a restore can itself be undone from the History panel.
-// The checkpoint deliberately has no clean-parse gate — restore must never
-// destroy state, even mid-error.
+// snapshot by text AND layout — see snapshotIfChanged — since drag/pan never
+// snapshots on its own, so layout can drift from the newest snapshot even
+// when the text hasn't), so a restore can itself be undone from the History
+// panel. The checkpoint deliberately has no clean-parse gate — restore must
+// never destroy state, even mid-error.
 export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
   const cur = currentRecord();
   if (!cur || cur.id !== snap.diagramId) return;
   invalidatePendingAutosave();
-  try {
-    const newest = (await listSnapshots(cur.id))[0];
-    if (!newest || newest.dbml !== cur.dbml) {
-      await putSnapshot({
-        id: nanoid(), diagramId: cur.id, takenAt: Date.now(), name: cur.name,
-        dbml: cur.dbml, positions: cur.positions, viewport: cur.viewport,
-      });
-    }
-  } catch {
-    // history is best-effort; the restore itself proceeds
-  }
+  await snapshotIfChanged(cur, true);
   const rec: DiagramRecord = {
     id: cur.id, name: snap.name, dbml: snap.dbml,
     positions: snap.positions, viewport: snap.viewport, updatedAt: Date.now(),
   };
   try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
+  // The checkpoint + putDiagram awaits above give a diagram switch/import
+  // room to land and repoint the store at a DIFFERENT diagram before we get
+  // here. Re-check before the tail mutation (both branches): patching live
+  // store state for the wrong diagram would corrupt it (and its own next
+  // autosave would then persist A's restored data under B's id).
+  if (useAppStore.getState().diagramId !== snap.diagramId) return;
   if (snap.dbml === cur.dbml) {
     // Text unchanged: loadDiagram would reset schema to EMPTY_SCHEMA and the
     // parse pipeline — keyed on [diagramId, source], both unchanged — would

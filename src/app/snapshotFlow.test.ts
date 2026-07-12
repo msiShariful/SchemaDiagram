@@ -117,6 +117,68 @@ describe('snapshot + import persistence flows', () => {
     expect((await getDiagram(a.id))?.positions['public.a']).toEqual({ x: 555, y: 66 });
   });
 
+  it('restore checkpoints layout-only drift even when text matches the newest snapshot', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE));
+    // A prior snapshot with the SAME text as the live diagram (e.g. taken
+    // right after this text was typed) — text-only dedupe would treat the
+    // live state as "unchanged" and skip the pre-restore checkpoint.
+    const textMatch: DiagramSnapshot = {
+      id: 'snap-textmatch', diagramId: a.id, takenAt: 50, name: 'A',
+      dbml: BASE, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(textMatch);
+    // Layout has since drifted (a drag/pan) without a text change — drag/pan
+    // never snapshots on its own, so this state was never captured.
+    useAppStore.getState().moveTable('public.a', { x: 999, y: 111 });
+    useAppStore.getState().setViewport({ x: 7, y: 8, zoom: 2 });
+
+    const target: DiagramSnapshot = {
+      id: 'snap-target', diagramId: a.id, takenAt: 200, name: 'A',
+      dbml: 'Table target { id int }', positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(target);
+
+    await restoreSnapshot(target);
+
+    const snaps = await listSnapshots(a.id);
+    const checkpoint = snaps.find((s) => s.dbml === BASE && s.positions['public.a']?.x === 999);
+    expect(checkpoint).toBeDefined(); // the drifted layout was NOT discarded silently
+    expect(checkpoint?.viewport).toEqual({ x: 7, y: 8, zoom: 2 });
+  });
+
+  it('restore aborts before mutating live state if the current diagram changed mid-flight', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE));
+    const snap: DiagramSnapshot = {
+      id: 'snap-x', diagramId: a.id, takenAt: 10, name: 'A',
+      dbml: 'Table restored { id int }', positions: { 'public.a': { x: 1, y: 1 } },
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(snap);
+
+    const p = restoreSnapshot(snap);
+    // Simulate a diagram switch (or import) landing on the store while
+    // restoreSnapshot's IDB awaits are still in flight — synchronous, so it
+    // beats every one of restoreSnapshot's internal awaits.
+    useAppStore.setState({
+      diagramId: 'diagram-b', diagramName: 'B', source: 'Table b { id int }',
+      positions: { 'public.b': { x: 5, y: 5 } }, viewport: { x: 9, y: 9, zoom: 3 },
+    });
+    await p;
+
+    const st = useAppStore.getState();
+    expect(st.diagramId).toBe('diagram-b');
+    expect(st.diagramName).toBe('B');
+    expect(st.source).toBe('Table b { id int }');
+    expect(st.positions).toEqual({ 'public.b': { x: 5, y: 5 } });
+    expect(st.viewport).toEqual({ x: 9, y: 9, zoom: 3 });
+  });
+
   it('import creates a NEW diagram and never overwrites the current one', async () => {
     const a = diagramA();
     await putDiagram(a);
