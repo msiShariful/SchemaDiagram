@@ -30,18 +30,35 @@ const SNAPSHOTS = 'snapshots';
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function db(): Promise<IDBPDatabase> {
-  dbPromise ??= openDB(DB_NAME, DB_VERSION, {
-    upgrade(d, oldVersion) {
-      // Guarded per-version so both fresh installs (0 → 2) and existing
-      // Plan-1 databases (1 → 2) arrive at the same shape without ever
-      // touching existing diagram rows.
-      if (oldVersion < 1) d.createObjectStore(STORE, { keyPath: 'id' });
-      if (oldVersion < 2) {
-        const snaps = d.createObjectStore(SNAPSHOTS, { keyPath: 'id' });
-        snaps.createIndex('byDiagram', 'diagramId');
-      }
-    },
-  });
+  if (!dbPromise) {
+    // Multi-tab guard: if another tab still holds a v1 connection open, a
+    // plain openDB(NAME, 2) never fires its success OR error event — it just
+    // hangs, silently, forever (no storage banner, edits stop persisting).
+    // `blocked` fires on OUR open request in that case; reject a companion
+    // promise so db() loses the race instead of hanging — every existing
+    // caller's catch already degrades to setStorageUnavailable(true).
+    let rejectBlocked!: (e: Error) => void;
+    const blockedPromise = new Promise<never>((_, reject) => { rejectBlocked = reject; });
+    const openPromise = openDB(DB_NAME, DB_VERSION, {
+      upgrade(d, oldVersion) {
+        // Guarded per-version so both fresh installs (0 → 2) and existing
+        // Plan-1 databases (1 → 2) arrive at the same shape without ever
+        // touching existing diagram rows.
+        if (oldVersion < 1) d.createObjectStore(STORE, { keyPath: 'id' });
+        if (oldVersion < 2) {
+          const snaps = d.createObjectStore(SNAPSHOTS, { keyPath: 'id' });
+          snaps.createIndex('byDiagram', 'diagramId');
+        }
+      },
+      blocked() {
+        rejectBlocked(new Error('IndexedDB open blocked by another connection (upgrade pending in another tab)'));
+      },
+      // We're the (older) connection blocking some OTHER tab's upgrade;
+      // step aside so that tab doesn't hang the same way.
+      blocking() { void openPromise.then((d) => d.close()); },
+    });
+    dbPromise = Promise.race([openPromise, blockedPromise]);
+  }
   return dbPromise;
 }
 
@@ -84,7 +101,12 @@ export async function putSnapshot(snap: DiagramSnapshot): Promise<void> {
 }
 
 export async function __resetForTests(): Promise<void> {
-  if (dbPromise) (await dbPromise).close();
+  if (dbPromise) {
+    // db() can now reject (blocked open, see db() above) instead of
+    // resolving — swallow that here so one blocked-open test doesn't wedge
+    // every test after it.
+    try { (await dbPromise).close(); } catch { /* open never completed */ }
+  }
   dbPromise = null;
   await deleteDB(DB_NAME);
 }

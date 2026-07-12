@@ -69,6 +69,20 @@ describe('snapshots', () => {
     expect((await listSnapshots('db')).map((s) => s.id)).toEqual(['b1']);
   });
 
+  it('rejects instead of hanging when a stale connection blocks the v2 open', async () => {
+    // Simulate another tab that still holds a v1 connection open when this
+    // tab's repository tries to open at v2 — without a `blocked` handler,
+    // openDB(name, 2) never fires success OR error, it just hangs forever.
+    const v1 = await openDB('dbdraft', 1, {
+      upgrade(d) { d.createObjectStore('diagrams', { keyPath: 'id' }); },
+    });
+    try {
+      await expect(listDiagrams()).rejects.toThrow(/blocked/i);
+    } finally {
+      v1.close(); // release it so the next test's deleteDB() in beforeEach doesn't hang too
+    }
+  });
+
   it('upgrades a v1 database in place, preserving diagrams', async () => {
     // Recreate the exact Plan-1 schema: version 1, diagrams store only.
     const v1 = await openDB('dbdraft', 1, {
