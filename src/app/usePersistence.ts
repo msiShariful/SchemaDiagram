@@ -38,10 +38,10 @@ function currentRecord(): DiagramRecord | null {
 //  - false (autosave): text-only, so a layout-only save (drag/pan) never
 //    produces a new History entry — snapshots are text milestones, not a
 //    pixel-by-pixel log.
-//  - true (pre-restore checkpoint): text AND positions/viewport, because a
-//    restore can discard layout that drifted (drag/pan) since the newest
-//    snapshot even when the text hasn't changed — dedupe-by-text-alone
-//    would then leave nothing to recover that layout from.
+//  - true (pre-restore checkpoint): text AND positions/notePositions/viewport,
+//    because a restore can discard layout that drifted (drag/pan, note move)
+//    since the newest snapshot even when the text hasn't changed — dedupe-by-
+//    text-alone would then leave nothing to recover that layout from.
 // Runs strictly AFTER the caller's diagram write has succeeded and swallows
 // every failure: history is best-effort and must never break, abort, or
 // reorder the write it follows.
@@ -50,6 +50,7 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
     const newest = (await listSnapshots(rec.id))[0];
     const sameLayout = !compareLayout || (
       JSON.stringify(newest?.positions) === JSON.stringify(rec.positions) &&
+      JSON.stringify(newest?.notePositions) === JSON.stringify(rec.notePositions) &&
       JSON.stringify(newest?.viewport) === JSON.stringify(rec.viewport)
     );
     if (newest && newest.dbml === rec.dbml && sameLayout) return;
@@ -60,6 +61,7 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
       name: rec.name,
       dbml: rec.dbml,
       positions: rec.positions,
+      notePositions: rec.notePositions,
       viewport: rec.viewport,
     });
   } catch {
@@ -204,6 +206,7 @@ export interface ImportedDiagram {
   name: string;
   dbml: string;
   positions?: Record<string, TablePosition>;
+  notePositions?: Record<string, TablePosition>;
   viewport?: Viewport;
 }
 
@@ -219,6 +222,7 @@ export async function importDiagram(imp: ImportedDiagram): Promise<void> {
     name: imp.name.trim() || 'Imported',
     dbml: imp.dbml,
     positions: imp.positions ?? {},
+    notePositions: imp.notePositions ?? {},
     viewport: imp.viewport ?? { x: 40, y: 40, zoom: 1 },
     updatedAt: Date.now(),
   };
@@ -240,7 +244,8 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
   await snapshotIfChanged(cur, true);
   const rec: DiagramRecord = {
     id: cur.id, name: snap.name, dbml: snap.dbml,
-    positions: snap.positions, viewport: snap.viewport, updatedAt: Date.now(),
+    positions: snap.positions, notePositions: snap.notePositions ?? {}, viewport: snap.viewport,
+    updatedAt: Date.now(),
   };
   try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
   // The checkpoint + putDiagram awaits above give a diagram switch/import
@@ -254,7 +259,9 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
     // parse pipeline — keyed on [diagramId, source], both unchanged — would
     // never re-fire, leaving a blank canvas. Patch layout state directly and
     // keep the live schema.
-    useAppStore.setState({ diagramName: rec.name, positions: rec.positions, viewport: rec.viewport });
+    useAppStore.setState({
+      diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions, viewport: rec.viewport,
+    });
   } else {
     useAppStore.getState().loadDiagram(rec);
   }

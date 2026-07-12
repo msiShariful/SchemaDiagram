@@ -50,6 +50,14 @@ const snap = (id: string, diagramId: string, takenAt: number): DiagramSnapshot =
 describe('snapshots', () => {
   beforeEach(async () => { await __resetForTests(); });
 
+  it('round-trips notePositions, and still loads an old-shaped snapshot without the field', async () => {
+    await putSnapshot({ ...snap('with-notes', 'da', 1), notePositions: { todo: { x: 3, y: 4 } } });
+    await putSnapshot(snap('legacy', 'da', 2)); // no notePositions key at all
+    const all = await listSnapshots('da');
+    expect(all.find((s) => s.id === 'with-notes')?.notePositions).toEqual({ todo: { x: 3, y: 4 } });
+    expect(all.find((s) => s.id === 'legacy')?.notePositions).toBeUndefined();
+  });
+
   it('lists snapshots for a diagram newest first, isolated per diagram', async () => {
     await putSnapshot(snap('a1', 'da', 100));
     await putSnapshot(snap('a2', 'da', 300));

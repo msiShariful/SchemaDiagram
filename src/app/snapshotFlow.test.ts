@@ -152,6 +152,68 @@ describe('snapshot + import persistence flows', () => {
     expect(checkpoint?.viewport).toEqual({ x: 7, y: 8, zoom: 2 });
   });
 
+  it('restore round-trips notePositions into live state and the persisted diagram', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE), BASE);
+    const snap: DiagramSnapshot = {
+      id: 's-notes', diagramId: a.id, takenAt: 5, name: 'A', dbml: BASE,
+      positions: {}, notePositions: { 'note-1': { x: 77, y: 88 } }, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(snap);
+
+    await restoreSnapshot(snap); // identical text to BASE -> patches layout in place
+
+    expect(useAppStore.getState().notePositions).toEqual({ 'note-1': { x: 77, y: 88 } });
+    expect((await getDiagram(a.id))?.notePositions).toEqual({ 'note-1': { x: 77, y: 88 } });
+  });
+
+  it('restoring an old-shaped snapshot without notePositions falls back to empty (backward compatible)', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE), BASE);
+    useAppStore.setState({ notePositions: { stale: { x: 1, y: 1 } } });
+    const snap: DiagramSnapshot = {
+      id: 's-old', diagramId: a.id, takenAt: 5, name: 'A', dbml: BASE,
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, // no notePositions field — pre-Plan-3 shape
+    };
+    await putSnapshot(snap);
+
+    await restoreSnapshot(snap);
+
+    expect(useAppStore.getState().notePositions).toEqual({});
+  });
+
+  it('restore checkpoints note-only drift even when text, positions, and viewport all match the newest snapshot', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE), BASE);
+    // The NEWEST snapshot matches live text, positions AND viewport — only
+    // notePositions has drifted (a note drag never snapshots on its own,
+    // same class as the layout-drift case above).
+    const textMatch: DiagramSnapshot = {
+      id: 'snap-textmatch-notes', diagramId: a.id, takenAt: 300, name: 'A',
+      dbml: BASE, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(textMatch);
+    useAppStore.setState({ notePositions: { 'note-1': { x: 42, y: 42 } } });
+
+    const target: DiagramSnapshot = {
+      id: 'snap-target-notes', diagramId: a.id, takenAt: 200, name: 'A',
+      dbml: 'Table target { id int }', positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(target);
+
+    await restoreSnapshot(target);
+
+    const snaps = await listSnapshots(a.id);
+    const checkpoint = snaps.find((s) => s.dbml === BASE && s.notePositions?.['note-1']?.x === 42);
+    expect(checkpoint).toBeDefined(); // the drifted note position was NOT discarded silently
+  });
+
   it('restore aborts before mutating live state if the current diagram changed mid-flight', async () => {
     const a = diagramA();
     await putDiagram(a);

@@ -80,6 +80,40 @@ describe('serializeProject / parseProject', () => {
     expect(Object.getPrototypeOf({})).toBe(Object.prototype);
   });
 
+  it('round-trips notePositions when provided', () => {
+    const r = parseProject(serializeProject({ ...input, notePositions: { note1: { x: 5, y: 6 } } }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.project.notePositions).toEqual({ note1: { x: 5, y: 6 } });
+  });
+
+  it('leaves notePositions absent (and still valid) when not provided', () => {
+    const r = parseProject(serializeProject(input)); // input has no notePositions
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.project.version).toBe(PROJECT_FILE_VERSION);
+    expect('notePositions' in r.project).toBe(false);
+  });
+
+  it('rejects a "__proto__" notePositions key instead of hijacking the prototype', () => {
+    const r = parseProject(
+      '{"version":1,"name":"Shop","dbml":"Table a { id int }","layout":{},"notePositions":{"__proto__":{"x":1,"y":2}},"viewport":{"x":0,"y":0,"zoom":1}}',
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toContain('not allowed');
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+  });
+
+  it('rejects malformed notePositions entries, naming the offender', () => {
+    const raw = JSON.parse(serializeProject(input)) as Record<string, unknown>;
+    raw.notePositions = { note1: { x: 'nope', y: 1 } };
+    const r = parseProject(JSON.stringify(raw));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toContain('note1');
+  });
+
   it('rejects a bad viewport (non-numeric or non-positive zoom)', () => {
     const raw = JSON.parse(serializeProject(input)) as Record<string, unknown>;
     raw.viewport = { x: 0, y: 0, zoom: 0 };

@@ -19,6 +19,7 @@ export interface DiagramSnapshot {
   name: string;
   dbml: string;
   positions: Record<string, TablePosition>;
+  notePositions?: Record<string, TablePosition>; // optional: pre-Plan-3 rows lack it
   viewport: Viewport;
 }
 

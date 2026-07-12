@@ -36,7 +36,10 @@ export function ExportMenu() {
   const exportProject = () => {
     const s = useAppStore.getState();
     downloadText(
-      serializeProject({ name: s.diagramName, dbml: s.source, positions: s.positions, viewport: s.viewport }),
+      serializeProject({
+        name: s.diagramName, dbml: s.source, positions: s.positions,
+        notePositions: s.notePositions, viewport: s.viewport,
+      }),
       `${safeFilename(s.diagramName)}.json`,
       'application/json',
     );

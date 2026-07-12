@@ -71,6 +71,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           name: r.project.name,
           dbml: r.project.dbml,
           positions: r.project.layout,
+          notePositions: r.project.notePositions,
           viewport: r.project.viewport,
         });
       } else {
