@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Local-first dbdiagram.io clone: DBML text on the left, live ER diagram on the right. React 19 + TypeScript (strict) + Vite, zustand, CodeMirror 6, `@dbml/core`, custom SVG canvas, IndexedDB. No backend.
 
-Design spec lives in `docs/superpowers/specs/`, per-milestone implementation plans in `docs/superpowers/plans/`. Milestones are tagged `plan-N-complete`. Remaining roadmap: Plan 3 canvas depth (LOD/culling, minimap, snap/guides, groups, sticky notes, ELK auto-layout, dark theme), Plan 4 interop (SQL import/export, PNG/SVG, snapshots), Plan 5 hardening (E2E, perf CI, bundle budget).
+Design spec lives in `docs/superpowers/specs/`, per-milestone implementation plans in `docs/superpowers/plans/`. Milestones are tagged `plan-N-complete`. All five milestones are complete. Regression guards: `npm test` (vitest units), `npm run test:e2e` (Playwright golden flows + perf budget), `npm run check:bundle` (main-chunk gzip budget + lazy-lib leak markers).
 
 ## Commands
 
@@ -18,9 +18,11 @@ npx vitest run src/editor/completion.test.ts  # one file
 npm run test:watch                            # watch mode
 npm run build                                 # tsc (strict, noEmit) + vite build
 npx tsc --noEmit                              # typecheck only
+npm run test:e2e                              # Playwright E2E (once: npx playwright install chromium)
+npm run check:bundle                          # build + main-chunk gzip budget / lazy-lib leak check
 ```
 
-Tests run in vitest's node environment — no DOM. Persistence tests use `fake-indexeddb`; editor logic is tested headlessly with CodeMirror's `EditorState` / `CompletionContext` / `StringStream`. Component wiring has no unit tests by design; it is verified in the browser.
+Tests run in vitest's node environment — no DOM. Persistence tests use `fake-indexeddb`; editor logic is tested headlessly with CodeMirror's `EditorState` / `CompletionContext` / `StringStream`. Component wiring has no unit tests by design; it is verified in the browser. Playwright E2E lives in `e2e/` (`*.spec.ts`, excluded from vitest via `test.include`); specs auto-start the dev server (`webServer` in `playwright.config.ts`) and may drive state through the dev-only `window.__appStore` hook.
 
 Work on a feature branch per plan (`feature/plan-N-...`); never implement directly on `main`.
 
@@ -30,7 +32,7 @@ Work on a feature branch per plan (`feature/plan-N-...`); never implement direct
 
 **Last good parse:** the canvas always renders the last successfully parsed schema. `applyParse` on failure sets only `errors`/`stale` — it must never clear `schema` or `positions`. Parse errors are the normal state while typing; the UI shows a stale badge, never a blank canvas.
 
-**Data flow:** keystroke → `store.source` → 300 ms debounced, latest-wins pipeline (`src/core/parse/pipeline.ts` — the sequence number is bumped in `push()`, not at timer fire; this prevents a stale in-flight parse from landing on a freshly switched diagram) → `@dbml/core` parse in a Web Worker (in-thread fallback; the adapter in `workerParse.ts` has a dead-flag + `dispose()` and **lazy-imports** the parser on fallback paths to keep `@dbml/core` out of the main chunk — main chunk is ~198 kB gzip vs the ~2.7 MB worker chunk) → `reconcilePositions` (rename heuristic: same field signature keeps position) + `placeNewTables`.
+**Data flow:** keystroke → `store.source` → 300 ms debounced, latest-wins pipeline (`src/core/parse/pipeline.ts` — the sequence number is bumped in `push()`, not at timer fire; this prevents a stale in-flight parse from landing on a freshly switched diagram) → `@dbml/core` parse in a Web Worker (in-thread fallback; the adapter in `workerParse.ts` has a dead-flag + `dispose()`, restarts a crashed worker once per input (`crashPolicy.ts`; two consecutive crashes on identical input → inline error, spec §9), and **lazy-imports** the parser on fallback paths — a failed chunk load resolves as `{ok:false, parser unavailable}` — keeping `@dbml/core` out of the main chunk: main chunk is ~206 kB gzip (budget 210 KiB, enforced by `npm run check:bundle`) vs the ~2.7 MB worker chunk) → `reconcilePositions` (rename heuristic: same field signature keeps position) + `placeNewTables`.
 
 **Text vs layout:** canvas interactions (drag, viewport, selection) write only layout state (`commitCanvasCommand`, `setViewport`, selection) — never DBML text. Table identity is `${schemaName}.${name}` with `public` default; `src/core/parse/parseDbml.ts` (normalizer) and `src/editor/sourceMap.ts` (text scanner) must agree on it.
 
@@ -46,4 +48,4 @@ Work on a feature branch per plan (`feature/plan-N-...`); never implement direct
 
 ## Known deferred items
 
-Cross-review deferred fixes are tracked in the untracked ledger `.superpowers/sdd/progress.md`. The ones that become load-bearing next: guard `onCommitMove` against zero-delta commits **before** Plan 3 adds canvas undo (double-click currently fires two no-op commits); `applyFormat`'s stale check races the 300 ms parse debounce (gate on `parsedSource === doc` when convenient); workerParse's lazy-chunk load failure path needs a `.catch` → `{ok:false, errors:[{message:'parser unavailable',...}]}` (Plan 5).
+Cross-review deferred fixes are tracked in the untracked ledger `.superpowers/sdd/progress.md`. Still open after Plan 5: SVG/PNG export serializes whatever LOD is currently mounted (forcing full detail needs an off-screen re-render — see the ponytail note in `svgExport.ts`); stale-drag click-select of a pruned table id (exotic, self-correcting). The Plan 5 wave closed: workerParse lazy-chunk `.catch`, worker crash restart, pan-from-anywhere, note drag threshold, theme FOUC, minimap pointercancel commit, marquee/pan pointer interleave.
