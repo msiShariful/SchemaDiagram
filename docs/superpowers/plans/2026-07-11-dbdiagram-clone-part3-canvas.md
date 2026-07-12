@@ -1711,7 +1711,8 @@ git add -A && git commit -m "feat: marquee multi-select, multi-drag, selection-a
 - Produces (components):
   - `TableNode` gains `lod: LodLevel` prop: `'full'` = today's rendering; `'shell'` = body + header + title, no field rows; `'box'` = one colored rect, no text. Height never changes across levels.
   - `DiagramCanvas` unmounts tables outside `visibleWorldRect` (half-viewport margin each side — pop-in only appears at pan end for tables more than half a screen away, the accepted trade for keeping pan imperative); `EdgeLayer` gains a `viewRect: Rect | null` prop and skips edges with BOTH endpoints offscreen.
-  - Culling cannot fight the imperative drag path: a mid-drag member that is culled simply has no element in the `nodeEls` registry — the DOM write is skipped, `drag.live` still carries its correct position into the commit.
+  - Culling cannot fight the imperative drag path: a mid-drag member that is culled simply has no element in the `nodeEls` registry — the DOM write is skipped, `drag.live` still carries its correct position into the commit. Culling must never unmount the pointer-capturing drag anchor; a wheel-zoom debounce commit can land mid-drag.
+  - Known accepted glitch: a wheel commit crossing an LOD threshold mid-drag re-renders the anchor with its stale committed transform until the next pointermove re-asserts the live position (self-healing, same accepted class as culling pop-in).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1923,7 +1924,9 @@ Update the render: `<EdgeLayer ref={edgeLayerRef} viewRect={viewRect} />` and re
           {schema.tables.map((t) => {
             const pos = positions[t.id];
             if (!pos) return null;
-            if (viewRect && !rectsOverlap(getTableRect(t, pos), viewRect)) return null;
+            // Never cull the drag anchor: its <g> holds pointer capture — unmounting it mid-drag would strand the gesture.
+            const isDragAnchor = dragRef.current?.id === t.id;
+            if (viewRect && !isDragAnchor && !rectsOverlap(getTableRect(t, pos), viewRect)) return null;
             return (
               <TableNode
                 key={t.id}
