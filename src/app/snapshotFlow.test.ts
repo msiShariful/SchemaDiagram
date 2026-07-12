@@ -193,10 +193,15 @@ describe('snapshot + import persistence flows', () => {
     useAppStore.getState().applyParse(parseDbml(BASE), BASE);
     // The NEWEST snapshot matches live text, positions AND viewport — only
     // notePositions has drifted (a note drag never snapshots on its own,
-    // same class as the layout-drift case above).
+    // same class as the layout-drift case above). The positions map is
+    // captured from live state (applyParse auto-placed public.a) and
+    // notePositions is {} not absent: every non-note field must genuinely
+    // match, or the checkpoint would fire on an unrelated mismatch and this
+    // test would pin nothing about the notePositions comparison.
     const textMatch: DiagramSnapshot = {
       id: 'snap-textmatch-notes', diagramId: a.id, takenAt: 300, name: 'A',
-      dbml: BASE, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
+      dbml: BASE, positions: { ...useAppStore.getState().positions },
+      notePositions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     };
     await putSnapshot(textMatch);
     useAppStore.setState({ notePositions: { 'note-1': { x: 42, y: 42 } } });
@@ -212,6 +217,30 @@ describe('snapshot + import persistence flows', () => {
     const snaps = await listSnapshots(a.id);
     const checkpoint = snaps.find((s) => s.dbml === BASE && s.notePositions?.['note-1']?.x === 42);
     expect(checkpoint).toBeDefined(); // the drifted note position was NOT discarded silently
+  });
+
+  it('same-text restore resets the canvas undo stack: a later undo cannot replay a pre-restore move', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE), BASE);
+    // A committed drag before the restore — its before/after coordinates
+    // belong to the pre-restore layout.
+    const placed = useAppStore.getState().positions['public.a'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move', notes: [],
+      tables: [{ id: 'public.a', before: placed, after: { x: 300, y: 300 } }],
+    });
+    const snap: DiagramSnapshot = {
+      id: 's-undo', diagramId: a.id, takenAt: 5, name: 'A', dbml: BASE, // identical text -> patch branch
+      positions: { 'public.a': { x: 555, y: 66 } }, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(snap);
+
+    await restoreSnapshot(snap);
+    useAppStore.getState().undoCanvas(); // must be a no-op, not a replay of the stale move
+
+    expect(useAppStore.getState().positions['public.a']).toEqual({ x: 555, y: 66 });
   });
 
   it('restore aborts before mutating live state if the current diagram changed mid-flight', async () => {

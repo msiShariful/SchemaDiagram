@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useAppStore, type DiagramRecord } from './store';
+import { useAppStore, resetCanvasStack, type DiagramRecord } from './store';
 import {
   listDiagrams, getDiagram, putDiagram, deleteDiagram, listSnapshots, putSnapshot,
 } from '../core/persist/repository';
@@ -258,7 +258,12 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
     // Text unchanged: loadDiagram would reset schema to EMPTY_SCHEMA and the
     // parse pipeline — keyed on [diagramId, source], both unchanged — would
     // never re-fire, leaving a blank canvas. Patch layout state directly and
-    // keep the live schema.
+    // keep the live schema. Like every other whole-map position replacement
+    // (all of which go through loadDiagram), the canvas undo stack must be
+    // reset: its commands hold pre-restore before/after coordinates, and
+    // popping one after the swap would snap a table to an unrelated spot —
+    // which autosave would then persist.
+    resetCanvasStack();
     useAppStore.setState({
       diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions, viewport: rec.viewport,
     });
