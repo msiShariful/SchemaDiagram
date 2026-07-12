@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
 import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
+import { GroupLayer } from './GroupLayer';
 import { MiniMap, type MiniMapHandle } from './MiniMap';
 import { TableNode } from './TableNode';
 import { zoomAt } from './viewport';
@@ -173,6 +174,34 @@ export function DiagramCanvas() {
   }, []);
   // (showGuides/hideGuides touch refs only, so the first-render closures
   // captured by the [] callbacks above stay correct.)
+
+  // Group-header drag: shift member table <g>s and their edges imperatively.
+  // Culled (unmounted) members simply have no element in the registry — the
+  // DOM write is skipped and the commit below still carries their positions.
+  const handleGroupLiveMove = useCallback(
+    (memberIds: string[], base: Record<string, TablePosition>, dx: number, dy: number) => {
+      const overrides: Record<string, TablePosition> = {};
+      for (const id of memberIds) {
+        const b = base[id];
+        if (!b) continue;
+        const p = { x: b.x + dx, y: b.y + dy };
+        overrides[id] = p;
+        nodeEls.current.get(id)?.setAttribute('transform', `translate(${p.x}, ${p.y})`);
+      }
+      edgeLayerRef.current?.updateTablePositions(overrides);
+    },
+    [],
+  );
+
+  const handleGroupCommit = useCallback(
+    (memberIds: string[], base: Record<string, TablePosition>, dx: number, dy: number, label: string) => {
+      const tables: PositionDelta[] = memberIds
+        .filter((id) => base[id])
+        .map((id) => ({ id, before: base[id], after: { x: base[id].x + dx, y: base[id].y + dy } }));
+      useAppStore.getState().commitCanvasCommand({ label, tables, notes: [] });
+    },
+    [],
+  );
 
   // A parse landing mid-gesture can prune/rename the dragged table; its DOM
   // node is removed, so pointerup/pointercancel may never fire and the ledger
@@ -370,6 +399,7 @@ export function DiagramCanvas() {
         onPointerCancel={onPointerUp}
       >
         <g ref={sceneRef}>
+          <GroupLayer zoomRef={zoomRef} onLiveMoveSet={handleGroupLiveMove} onCommitMoveSet={handleGroupCommit} />
           <EdgeLayer ref={edgeLayerRef} viewRect={viewRect} />
           {schema.tables.map((t) => {
             const pos = positions[t.id];

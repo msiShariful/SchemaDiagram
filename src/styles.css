@@ -88,3 +88,6 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .table-box { fill: var(--table-header); stroke: var(--border); }
 .table-node.selected .table-box,
 .table-node.focused .table-box { stroke: var(--accent); stroke-width: 2; }
+.group-rect { fill-opacity: 0.05; stroke-width: 1.5; stroke-dasharray: 6 4; }
+.group-header { cursor: grab; }
+.group-title { font-size: 12px; font-weight: 600; fill: var(--text); }
