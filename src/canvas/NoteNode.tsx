@@ -6,10 +6,14 @@ interface Props {
   note: StickyNote;
   pos: TablePosition;
   zoomRef: React.RefObject<number>;
+  // Canvas-level ledger of the in-flight note drag (note id or null) so the
+  // culling pass can keep the drag anchor mounted — mirrors the table path's
+  // dragRef. A ref, never state: written on the imperative drag path.
+  dragLedger: React.RefObject<string | null>;
   onCommitMove: (id: string, before: TablePosition, after: TablePosition) => void;
 }
 
-export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, onCommitMove }: Props) {
+export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, dragLedger, onCommitMove }: Props) {
   const gRef = useRef<SVGGElement>(null);
   const drag = useRef<{ startX: number; startY: number; orig: TablePosition; live: TablePosition } | null>(null);
 
@@ -18,6 +22,7 @@ export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, onCommitMov
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
     drag.current = { startX: e.clientX, startY: e.clientY, orig: pos, live: pos };
+    dragLedger.current = note.id;
   };
   const onPointerMove = (e: React.PointerEvent<SVGGElement>) => {
     const d = drag.current;
@@ -33,6 +38,7 @@ export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, onCommitMov
     const d = drag.current;
     if (!d) return;
     drag.current = null;
+    dragLedger.current = null;
     onCommitMove(note.id, d.orig, d.live);
   };
 
@@ -45,6 +51,7 @@ export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, onCommitMov
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onLostPointerCapture={onPointerUp}
     >
       <rect width={NOTE_WIDTH} height={NOTE_HEIGHT} rx={4} className="note-body" />
       <text x={10} y={16} className="note-title">{note.name}</text>

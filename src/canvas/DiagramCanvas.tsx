@@ -37,6 +37,7 @@ export function DiagramCanvas() {
   const guideYRef = useRef<SVGLineElement>(null);
   const nodeEls = useRef(new Map<string, SVGGElement>());
   const dragRef = useRef<DragState | null>(null);
+  const noteDragRef = useRef<string | null>(null); // in-flight note drag (NoteNode writes it)
   const vpRef = useRef<Viewport>(useAppStore.getState().viewport);
   const zoomRef = useRef<number>(vpRef.current.zoom);
   const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -440,8 +441,11 @@ export function DiagramCanvas() {
           {schema.notes.map((n) => {
             const pos = notePositions[n.id];
             if (!pos) return null;
-            if (viewRect && !rectsOverlap(getNoteRect(pos), viewRect)) return null;
-            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} onCommitMove={handleNoteCommit} />;
+            // Same drag-anchor exemption as tables: unmounting the note that
+            // holds pointer capture would strand the drag with no pointerup.
+            const isDragAnchor = noteDragRef.current === n.id;
+            if (viewRect && !isDragAnchor && !rectsOverlap(getNoteRect(pos), viewRect)) return null;
+            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} dragLedger={noteDragRef} onCommitMove={handleNoteCommit} />;
           })}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
