@@ -1,5 +1,5 @@
 import type { Schema, Table, TablePosition, Rect } from '../model/types';
-import { getTableRect, TABLE_WIDTH } from '../model/geometry';
+import { getTableRect, TABLE_WIDTH, NOTE_WIDTH, NOTE_HEIGHT } from '../model/geometry';
 
 const MARGIN = 40;
 const GAP = 60;
@@ -71,6 +71,27 @@ export function placeNewTables(
     out[table.id] = chosen;
     allPositions[table.id] = chosen;
     placedRects.push({ ...chosen, w: rect.w, h: rect.h });
+  }
+  return out;
+}
+
+/** Deterministic placement for standalone notes that have no position yet.
+ *  Notes are keyed by name — no rename heuristic by design (spec §3). */
+export function placeNewNotes(
+  schema: Schema,
+  notePositions: Record<string, TablePosition>,
+  occupied: Rect[],
+): Record<string, TablePosition> {
+  const placed: Rect[] = [
+    ...occupied,
+    ...Object.values(notePositions).map((p) => ({ x: p.x, y: p.y, w: NOTE_WIDTH, h: NOTE_HEIGHT })),
+  ];
+  const out: Record<string, TablePosition> = {};
+  for (const note of schema.notes) {
+    if (notePositions[note.id]) continue;
+    const spot = gridScan(NOTE_WIDTH, NOTE_HEIGHT, placed);
+    out[note.id] = spot;
+    placed.push({ ...spot, w: NOTE_WIDTH, h: NOTE_HEIGHT });
   }
   return out;
 }

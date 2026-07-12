@@ -10,6 +10,8 @@
   --edge-hover: #2f6fed;
   --error: #d33;
   --guide: #e0407f;
+  --note-bg: #fff8c5;
+  --note-border: #d8c96f;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -91,3 +93,10 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .group-rect { fill-opacity: 0.05; stroke-width: 1.5; stroke-dasharray: 6 4; }
 .group-header { cursor: grab; }
 .group-title { font-size: 12px; font-weight: 600; fill: var(--text); }
+.sticky-note { cursor: grab; }
+.note-body { fill: var(--note-bg); stroke: var(--note-border); }
+.note-title { font-size: 11px; font-weight: 600; fill: var(--text); }
+.note-content {
+  font-size: 11px; color: var(--text); font-family: system-ui, sans-serif;
+  white-space: pre-wrap; overflow: hidden; height: 100%;
+}

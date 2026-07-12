@@ -23,7 +23,7 @@ function currentRecord(): DiagramRecord | null {
   if (!s.diagramId) return null;
   return {
     id: s.diagramId, name: s.diagramName, dbml: s.source,
-    positions: s.positions, viewport: s.viewport, updatedAt: Date.now(),
+    positions: s.positions, notePositions: s.notePositions, viewport: s.viewport, updatedAt: Date.now(),
   };
 }
 
@@ -162,7 +162,7 @@ export function usePersistence(): void {
     })();
 
     const unsub = useAppStore.subscribe(
-      (s) => [s.source, s.positions, s.viewport, s.diagramName] as const,
+      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions] as const,
       () => scheduleAutosave(),
       { equalityFn: (a, b) => a.every((v, i) => Object.is(v, b[i])) },
     );

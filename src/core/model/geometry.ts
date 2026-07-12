@@ -20,3 +20,10 @@ export function getTableRect(table: Table, pos: TablePosition): Rect {
 export function rectsOverlap(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
+
+export const NOTE_WIDTH = 180;
+export const NOTE_HEIGHT = 120;
+
+export function getNoteRect(pos: TablePosition): Rect {
+  return { x: pos.x, y: pos.y, w: NOTE_WIDTH, h: NOTE_HEIGHT };
+}

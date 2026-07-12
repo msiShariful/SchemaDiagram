@@ -4,13 +4,14 @@ import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
 import { GroupLayer } from './GroupLayer';
 import { MiniMap, type MiniMapHandle } from './MiniMap';
 import { TableNode } from './TableNode';
+import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
 import { snapPosition, SNAP_TOLERANCE, type GuideLine } from './snap';
 import { rectFromPoints, idsInRect } from './marquee';
 import { lodLevel } from './lod';
 import { visibleWorldRect } from './culling';
-import { getTableRect, rectsOverlap, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
+import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
 import { revealTable } from '../editor/editorNav';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
@@ -46,6 +47,7 @@ export function DiagramCanvas() {
 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
+  const notePositions = useAppStore((s) => s.notePositions);
   const setHoveredTable = useAppStore((s) => s.setHoveredTable);
   const editorFocusTableId = useAppStore((s) => s.editorFocusTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
@@ -202,6 +204,14 @@ export function DiagramCanvas() {
     },
     [],
   );
+
+  const handleNoteCommit = useCallback((id: string, before: TablePosition, after: TablePosition) => {
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move note',
+      tables: [],
+      notes: [{ id, before, after }],
+    });
+  }, []);
 
   // A parse landing mid-gesture can prune/rename the dragged table; its DOM
   // node is removed, so pointerup/pointercancel may never fire and the ledger
@@ -426,6 +436,12 @@ export function DiagramCanvas() {
                 registerEl={registerNodeEl}
               />
             );
+          })}
+          {schema.notes.map((n) => {
+            const pos = notePositions[n.id];
+            if (!pos) return null;
+            if (viewRect && !rectsOverlap(getNoteRect(pos), viewRect)) return null;
+            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} onCommitMove={handleNoteCommit} />;
           })}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />

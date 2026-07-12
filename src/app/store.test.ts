@@ -256,3 +256,50 @@ describe('table selection', () => {
     expect(useAppStore.getState().selectedTableIds).toEqual([]);
   });
 });
+
+describe('sticky note positions', () => {
+  beforeEach(reset);
+  const NOTE_SRC = "Table a { id int }\nNote todo {\n  'hello'\n}";
+
+  it('applyParse places new notes and keeps them across edits', () => {
+    useAppStore.getState().applyParse(parseDbml(NOTE_SRC), NOTE_SRC);
+    const placed = useAppStore.getState().notePositions.todo;
+    expect(placed).toBeDefined();
+    useAppStore.setState({ notePositions: { todo: { x: 555, y: 444 } } });
+    const src2 = NOTE_SRC + '\nTable b { id int }';
+    useAppStore.getState().applyParse(parseDbml(src2), src2);
+    expect(useAppStore.getState().notePositions.todo).toEqual({ x: 555, y: 444 });
+  });
+
+  it('applyParse prunes positions of deleted notes', () => {
+    useAppStore.getState().applyParse(parseDbml(NOTE_SRC), NOTE_SRC);
+    const src2 = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(src2), src2);
+    expect(useAppStore.getState().notePositions.todo).toBeUndefined();
+  });
+
+  it('note moves commit through the command stack and undo', () => {
+    useAppStore.getState().applyParse(parseDbml(NOTE_SRC), NOTE_SRC);
+    const before = useAppStore.getState().notePositions.todo;
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move note', tables: [], notes: [{ id: 'todo', before, after: { x: 9, y: 9 } }],
+    });
+    expect(useAppStore.getState().notePositions.todo).toEqual({ x: 9, y: 9 });
+    useAppStore.getState().undoCanvas();
+    expect(useAppStore.getState().notePositions.todo).toEqual(before);
+  });
+
+  it('loadDiagram restores notePositions (defaulting to empty)', () => {
+    useAppStore.getState().loadDiagram({
+      id: 'd5', name: 'N', dbml: NOTE_SRC,
+      positions: {}, notePositions: { todo: { x: 7, y: 8 } },
+      viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().notePositions).toEqual({ todo: { x: 7, y: 8 } });
+    useAppStore.getState().loadDiagram({
+      id: 'd6', name: 'O', dbml: 'Table x { id int }',
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().notePositions).toEqual({});
+  });
+});

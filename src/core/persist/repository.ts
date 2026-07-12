@@ -6,6 +6,7 @@ export interface PersistedDiagram {
   name: string;
   dbml: string;
   positions: Record<string, TablePosition>;
+  notePositions?: Record<string, TablePosition>; // optional: pre-Plan-3 records lack it
   viewport: Viewport;
   updatedAt: number;
 }

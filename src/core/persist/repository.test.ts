@@ -30,4 +30,10 @@ describe('repository', () => {
     expect(await getDiagram('x')).toBeUndefined();
     expect(await listDiagrams()).toEqual([]);
   });
+
+  it('round-trips notePositions', async () => {
+    await putDiagram({ ...rec('n', 5), notePositions: { todo: { x: 3, y: 4 } } });
+    const got = await getDiagram('n');
+    expect(got?.notePositions).toEqual({ todo: { x: 3, y: 4 } });
+  });
 });

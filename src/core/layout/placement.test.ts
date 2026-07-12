@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { placeNewTables } from './placement';
-import { getTableRect } from '../model/geometry';
+import { placeNewTables, placeNewNotes } from './placement';
+import { getTableRect, NOTE_WIDTH, NOTE_HEIGHT, getNoteRect } from '../model/geometry';
 import type { Schema, Table, Rect } from '../model/types';
 
 const mkTable = (name: string, fieldCount = 3): Table => ({
@@ -51,5 +51,28 @@ describe('placeNewTables', () => {
     const p = placed['public.posts'];
     const dist = Math.hypot(p.x - 1000, p.y - 1000);
     expect(dist).toBeLessThan(600);
+  });
+});
+
+describe('placeNewNotes', () => {
+  const note = (name: string) => ({ id: name, name, content: '' });
+
+  it('places unpositioned notes deterministically without overlap', () => {
+    const schema: Schema = { tables: [], refs: [], enums: [], groups: [], notes: [note('a'), note('b')] };
+    const out = placeNewNotes(schema, {}, []);
+    expect(Object.keys(out)).toEqual(['a', 'b']);
+    expect(overlaps(getNoteRect(out.a), getNoteRect(out.b))).toBe(false);
+    expect(placeNewNotes(schema, {}, [])).toEqual(out); // deterministic
+  });
+
+  it('avoids occupied rects and existing note positions', () => {
+    const schema: Schema = { tables: [], refs: [], enums: [], groups: [], notes: [note('a'), note('b')] };
+    const existing = { a: { x: 60, y: 60 } };
+    const out = placeNewNotes(schema, existing, [{ x: 300, y: 60, w: 220, h: 88 }]);
+    expect(out.a).toBeUndefined(); // already positioned
+    expect(overlaps(getNoteRect(out.b), getNoteRect(existing.a))).toBe(false);
+    expect(overlaps(getNoteRect(out.b), { x: 300, y: 60, w: 220, h: 88 })).toBe(false);
+    expect(NOTE_WIDTH).toBe(180);
+    expect(NOTE_HEIGHT).toBe(120);
   });
 });

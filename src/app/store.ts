@@ -5,7 +5,8 @@ import { EMPTY_SCHEMA } from '../core/model/types';
 import type { ParseError, ParseResult } from '../core/parse/parseDbml';
 import type { PersistedDiagram } from '../core/persist/repository';
 import { reconcilePositions } from '../core/model/reconcile';
-import { placeNewTables } from '../core/layout/placement';
+import { placeNewTables, placeNewNotes } from '../core/layout/placement';
+import { getTableRect } from '../core/model/geometry';
 import {
   applyDeltas, createCommandStack, isNoopCommand, pruneZeroDeltas,
   type CanvasCommand, type CommandStack,
@@ -28,9 +29,11 @@ export function resetCanvasStack(): void {
 // tracked in the current position maps. For tables this matches "still
 // exists in the schema": reconcilePositions() prunes `positions` to the live
 // schema on every successful parse, so a deleted table's key is already gone
-// here. Notes have no schema-backed existence yet (sticky-note parsing lands
-// in a later Plan 3 task — parseDbml's normalizer always emits `notes: []`),
-// so the notePositions map itself is the only source of truth available now.
+// here. Notes get the analogous prune-then-place pass in applyParse (keyed
+// by note name — no rename heuristic by design), so notePositions membership
+// is likewise equivalent to schema.notes membership after every successful
+// parse; the notePositions map is still what's checked here, it's just kept
+// in sync with the schema by that pass rather than by this filter.
 // Used by BOTH the commit path (a parse can land mid-drag: single,
 // multi-select, or group) and the undo/redo replay path.
 function filterToLive(
@@ -110,13 +113,23 @@ export const useAppStore = create<AppState>()(
         set({ errors: result.errors, stale: true });
         return;
       }
-      const { schema: prev, positions, selectedTableIds } = get();
+      const { schema: prev, positions, notePositions, selectedTableIds } = get();
       const kept = reconcilePositions(prev, result.schema, positions);
       const placed = placeNewTables(result.schema, kept);
+      const nextPositions = { ...kept, ...placed };
+      const keptNotes: Record<string, TablePosition> = {};
+      for (const n of result.schema.notes) {
+        if (notePositions[n.id]) keptNotes[n.id] = notePositions[n.id];
+      }
+      const occupied = result.schema.tables
+        .filter((t) => nextPositions[t.id])
+        .map((t) => getTableRect(t, nextPositions[t.id]));
+      const placedNotes = placeNewNotes(result.schema, keptNotes, occupied);
       const tableIds = new Set(result.schema.tables.map((t) => t.id));
       set({
         schema: result.schema,
-        positions: { ...kept, ...placed },
+        positions: nextPositions,
+        notePositions: { ...keptNotes, ...placedNotes },
         selectedTableIds: selectedTableIds.filter((id) => tableIds.has(id)),
         errors: [],
         stale: false,
@@ -165,7 +178,7 @@ export const useAppStore = create<AppState>()(
         diagramName: rec.name,
         source: rec.dbml,
         positions: rec.positions,
-        notePositions: {},
+        notePositions: rec.notePositions ?? {},
         viewport: rec.viewport,
         schema: EMPTY_SCHEMA,
         errors: [],
