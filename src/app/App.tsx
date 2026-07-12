@@ -13,6 +13,7 @@ import { HistoryPanel } from './HistoryPanel';
 import { ImportDialog } from './ImportDialog';
 import { downloadText } from './export/download';
 import { safeFilename } from './export/exportCss';
+import { CanvasErrorBoundary } from './CanvasErrorBoundary';
 
 const THEME_KEY = 'dbdraft.theme';
 type Theme = 'light' | 'dark';
@@ -88,7 +89,14 @@ export function App() {
           </button>
         </div>
       )}
-      <SplitPane left={<DbmlEditor />} right={<DiagramCanvas />} />
+      <SplitPane
+        left={<DbmlEditor />}
+        right={
+          <CanvasErrorBoundary>
+            <DiagramCanvas />
+          </CanvasErrorBoundary>
+        }
+      />
       <ProblemsPanel />
       <footer className="statusbar">
         <span className={errors.length ? 'status-errors' : 'status-ok'}>
