@@ -2,12 +2,25 @@ import { useEffect, useRef } from 'react';
 import { EditorView, keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { setDiagnostics } from '@codemirror/lint';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { dbmlLanguage } from './dbmlLanguage';
 import { errorToDiagnostic } from './diagnostics';
 import { createDbmlCompletion } from './completion';
 import { registerEditorView, applyFormat } from './editorNav';
 import { buildTableRanges, tableAtPos } from './sourceMap';
 import { useAppStore } from '../app/store';
+
+// Stream tokenizer token names map onto these tags (`keyword`, `comment`,
+// `string`, `number`, `attribute` -> `attributeName`, `def` -> `definition(variableName)`).
+const dbmlHighlight = HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--code-keyword)' },
+  { tag: tags.comment, color: 'var(--code-comment)', fontStyle: 'italic' },
+  { tag: tags.string, color: 'var(--code-string)' },
+  { tag: tags.number, color: 'var(--code-number)' },
+  { tag: tags.attributeName, color: 'var(--code-attribute)' },
+  { tag: tags.definition(tags.variableName), color: 'var(--code-def)' },
+]);
 
 export function DbmlEditor() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -34,6 +47,7 @@ export function DbmlEditor() {
       extensions: [
         basicSetup,
         dbmlLanguage,
+        syntaxHighlighting(dbmlHighlight),
         dbmlLanguage.data.of({
           autocomplete: createDbmlCompletion(() => useAppStore.getState().schema),
         }),

@@ -1,17 +1,69 @@
 :root {
   --bg: #ffffff;
   --bg-panel: #f6f7f9;
+  --bg-elev: #ffffff;
+  --canvas-bg: #fafbfc;
   --border: #d9dde3;
   --text: #1f2430;
   --text-dim: #6b7280;
   --accent: #2f6fed;
   --table-header: #3d5a80;
+  --table-bg: #ffffff;
+  --table-title-text: #ffffff;
   --edge: #8a93a3;
   --edge-hover: #2f6fed;
   --error: #d33;
+  --status-ok: #2e7d32;
+  --badge-bg: #fdf0d5;
+  --badge-text: #92600a;
+  --banner-bg: #fdecea;
+  --banner-text: #a33333;
+  --problems-bg: #fff6f6;
+  --problems-hover: #ffecec;
+  --selection-bg: #eef3fe;
   --guide: #e0407f;
   --note-bg: #fff8c5;
   --note-border: #d8c96f;
+  --code-keyword: #8250df;
+  --code-string: #0a7d4b;
+  --code-number: #b25e09;
+  --code-comment: #6e7781;
+  --code-attribute: #953800;
+  --code-def: #0550ae;
+}
+
+:root[data-theme='dark'] {
+  --bg: #16181d;
+  --bg-panel: #1e2128;
+  --bg-elev: #23262e;
+  --canvas-bg: #101216;
+  --border: #363b45;
+  --text: #dfe3ea;
+  --text-dim: #8b93a1;
+  --accent: #5b8def;
+  --table-header: #46639b;
+  --table-bg: #1e222b;
+  --table-title-text: #f2f5fa;
+  --edge: #6b7484;
+  --edge-hover: #5b8def;
+  --error: #f07178;
+  --status-ok: #6fbf73;
+  --badge-bg: #3d3423;
+  --badge-text: #e5b567;
+  --banner-bg: #3a2626;
+  --banner-text: #f0a8a8;
+  --problems-bg: #2a2022;
+  --problems-hover: #3a2a2e;
+  --selection-bg: #24324a;
+  --guide: #ff7ab0;
+  --note-bg: #3a3623;
+  --note-border: #6b633a;
+  --code-keyword: #c792ea;
+  --code-string: #a5d6a7;
+  --code-number: #f2b366;
+  --code-comment: #7a8494;
+  --code-attribute: #ffcb6b;
+  --code-def: #82aaff;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -26,12 +78,12 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .editor-pane { width: 38%; min-width: 240px; border-right: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
 .divider { width: 5px; cursor: col-resize; background: transparent; margin-left: -3px; z-index: 5; }
 .divider:hover { background: var(--accent); opacity: 0.4; }
-.canvas-pane { flex: 1; min-width: 0; position: relative; overflow: hidden; background: #fafbfc; }
+.canvas-pane { flex: 1; min-width: 0; position: relative; overflow: hidden; background: var(--canvas-bg); }
 .diagram-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
 .table-node { cursor: grab; }
-.table-body { fill: #fff; stroke: var(--border); }
+.table-body { fill: var(--table-bg); stroke: var(--border); }
 .table-header { fill: var(--table-header); }
-.table-title { fill: #fff; font-size: 13px; font-weight: 600; }
+.table-title { fill: var(--table-title-text); font-size: 13px; font-weight: 600; }
 .field-name { font-size: 12px; fill: var(--text); }
 .field-name.pk { font-weight: 600; }
 .field-type { font-size: 11px; fill: var(--text-dim); }
@@ -40,41 +92,42 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   display: flex; gap: 16px; padding: 3px 12px; font-size: 12px;
   border-top: 1px solid var(--border); background: var(--bg-panel);
 }
-.status-ok { color: #2e7d32; }
+.status-ok { color: var(--status-ok); }
 .status-errors { color: var(--error); }
 .status-dim { color: var(--text-dim); }
-.badge.stale { font-size: 11px; color: #92600a; background: #fdf0d5; padding: 2px 8px; border-radius: 10px; }
+.badge.stale { font-size: 11px; color: var(--badge-text); background: var(--badge-bg); padding: 2px 8px; border-radius: 10px; }
 .edge path { fill: none; stroke: var(--edge); stroke-width: 1.5; }
 .edge.hot path { stroke: var(--edge-hover); stroke-width: 2.5; }
 .edge-label { font-size: 10px; fill: var(--text-dim); }
 .edge.hot .edge-label { fill: var(--edge-hover); }
 .diagram-manager { display: flex; align-items: center; gap: 6px; position: relative; }
-.diagram-manager button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; }
+.diagram-manager button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer; }
 .diagram-manager .name-button { font-weight: 600; }
 .diagram-manager .name-input { font-size: 12px; padding: 3px 6px; }
 .diagram-list {
   position: absolute; top: 30px; left: 0; z-index: 20; min-width: 340px;
-  background: #fff; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12); list-style: none; margin: 0; padding: 4px;
 }
 .diagram-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; }
-.diagram-list li.current { background: #eef3fe; }
-.diagram-list .open-button { flex: 1; text-align: left; border: none; background: none; font-weight: 500; }
+.diagram-list li.current { background: var(--selection-bg); }
+.diagram-list .open-button { flex: 1; text-align: left; border: none; background: none; font-weight: 500; color: var(--text); }
 .diagram-list .when { font-size: 10px; color: var(--text-dim); }
 .diagram-list .danger { color: var(--error); }
-.banner-warning { background: #fdecea; color: #a33; padding: 6px 12px; font-size: 13px; }
+.banner-warning { background: var(--banner-bg); color: var(--banner-text); padding: 6px 12px; font-size: 13px; }
 .canvas-wrap { position: absolute; inset: 0; }
 .zoom-controls {
   position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; align-items: center;
-  background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px;
 }
-.zoom-controls button { border: none; background: none; font-size: 14px; cursor: pointer; padding: 2px 6px; }
+.zoom-controls button { border: none; background: none; font-size: 14px; cursor: pointer; padding: 2px 6px; color: var(--text); }
+.format-button, .theme-button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer; }
 .format-button:disabled { opacity: 0.45; cursor: not-allowed; }
-.problems-panel { border-top: 1px solid var(--border); background: #fff6f6; font-size: 12px; }
+.problems-panel { border-top: 1px solid var(--border); background: var(--problems-bg); font-size: 12px; }
 .problems-header { display: block; width: 100%; text-align: left; border: none; background: none; padding: 4px 12px; cursor: pointer; color: var(--error); font-weight: 600; }
 .problems-list { list-style: none; margin: 0; padding: 0 0 4px; max-height: 110px; overflow-y: auto; }
-.problems-list button { border: none; background: none; cursor: pointer; padding: 2px 16px; width: 100%; text-align: left; }
-.problems-list button:hover { background: #ffecec; }
+.problems-list button { border: none; background: none; cursor: pointer; padding: 2px 16px; width: 100%; text-align: left; color: var(--text); }
+.problems-list button:hover { background: var(--problems-hover); }
 .minimap {
   position: absolute; right: 12px; bottom: 52px; display: block;
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
@@ -100,3 +153,12 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   font-size: 11px; color: var(--text); font-family: system-ui, sans-serif;
   white-space: pre-wrap; overflow: hidden; height: 100%;
 }
+.editor-pane .cm-editor { background: var(--bg); color: var(--text); }
+.editor-pane .cm-editor .cm-gutters { background: var(--bg-panel); color: var(--text-dim); border-right: 1px solid var(--border); }
+.editor-pane .cm-editor .cm-activeLine { background: transparent; }
+.editor-pane .cm-editor .cm-activeLineGutter { background: transparent; }
+.editor-pane .cm-editor .cm-cursor { border-left-color: var(--text); }
+.editor-pane .cm-editor .cm-selectionBackground,
+.editor-pane .cm-editor.cm-focused .cm-selectionBackground { background: var(--selection-bg); }
+.editor-pane .cm-editor .cm-tooltip { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); }
+.editor-pane .cm-editor .cm-tooltip-autocomplete ul li[aria-selected] { background: var(--selection-bg); color: var(--text); }
