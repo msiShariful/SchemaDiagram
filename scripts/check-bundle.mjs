@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+// Bundle budget guard (Plan 5). Fails the build when the main chunk exceeds
+// the gzip budget or when a lazy-only library's marker strings leak into it.
+//
+// Budget rationale: CLAUDE.md pins the main chunk at ~210 kB gzip; the
+// Plan 3+4 merge measured 208.37 kB. 210 KiB (215,040 bytes) leaves ~6 kB
+// headroom for small UI additions, while an accidental static import of
+// @dbml/core (~2.7 MB chunk) or elk.bundled (~1.4 MB) overshoots by an
+// order of magnitude — and the marker check names the culprit even when
+// minification shifts sizes.
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+
+const BUDGET_BYTES = Number(process.env.BUNDLE_BUDGET ?? 210 * 1024);
+// Markers that exist ONLY in lazy chunks: elk.bundled.js ships ELK's Java
+// option ids ('org.eclipse.elk…'); the @dbml/core chunk (reachable only via
+// dynamic import of parseDbml.ts) contains the 'dbmlv2' format literal.
+// src/core/layout/elkGraph.ts deliberately uses the short 'elk.*' option
+// keys, so the entry chunk is marker-free unless a leak happens.
+// NOTE: the 'dbmlv2' check assumes the default MINIFIED build — source
+// COMMENTS in main-chunk files (e.g. convert.ts) mention the string and
+// esbuild strips them; under build.minify:false this would false-positive.
+const FORBIDDEN = ['org.eclipse.elk', 'dbmlv2'];
+
+execSync('npm run build', { stdio: 'inherit' });
+
+const html = readFileSync('dist/index.html', 'utf8');
+const entry = html.match(/assets\/index-[^"]+\.js/)?.[0];
+if (!entry) {
+  console.error('check-bundle: could not find the entry chunk in dist/index.html');
+  process.exit(1);
+}
+const chunk = readFileSync(`dist/${entry}`);
+const gzBytes = gzipSync(chunk).length;
+
+const failures = [];
+if (gzBytes > BUDGET_BYTES) {
+  failures.push(`entry chunk ${entry} is ${gzBytes} bytes gzipped — budget is ${BUDGET_BYTES}`);
+}
+for (const marker of FORBIDDEN) {
+  if (chunk.includes(marker)) {
+    failures.push(`entry chunk contains "${marker}" — a lazy-only library leaked into the main bundle`);
+  }
+}
+
+if (failures.length > 0) {
+  console.error(`check-bundle FAILED:\n  ${failures.join('\n  ')}`);
+  process.exit(1);
+}
+console.log(`check-bundle OK: ${entry} is ${gzBytes} bytes gzipped (budget ${BUDGET_BYTES}); no lazy-lib markers.`);
