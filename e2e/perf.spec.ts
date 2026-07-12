@@ -11,11 +11,14 @@ test('120-table fixture renders inside the cold budget and pans without long-tas
   // Fixture-discovered: the 150-ref chain topology (Task 4) places every
   // table directly right of its chain predecessor (placeNewTables always
   // finds that slot free first), so the 120-table bbox is ~33,540 x 312 —
-  // one row, extreme aspect ratio. At the default ~1280px viewport, fitting
-  // that needs zoom ~0.04, below MIN_ZOOM (0.1, src/canvas/viewport.ts), so
-  // zoom-to-fit clamps and culling drops the tables outside the clamped
-  // view. A wide viewport keeps the fit-zoom above the floor (unclamped),
-  // restoring the "fit -> all 120 mounted" assumption this spec relies on.
+  // one row, extreme aspect ratio. Fit-zoom stays pinned at MIN_ZOOM (0.1,
+  // src/canvas/viewport.ts) at ANY viewport size for a scene this wide (the
+  // SVG pane never gets the ~3,434px it would need to clear the floor).
+  // What the wide viewport actually changes is the culling margin:
+  // visibleWorldRect (src/canvas/culling.ts) spans 2 x viewW / zoom world
+  // px — proportional to raw viewport pixel width, independent of the
+  // clamp. At 4000px window width the cull rect is ~49,560 world px, wider
+  // than the 33,540px scene, so all 120 tables stay mounted after fit.
   await page.setViewportSize({ width: 4000, height: 1200 });
   await page.goto('/');
   await expect(page.locator('.table-node').first()).toBeVisible(); // app booted (starter parsed)
@@ -52,14 +55,16 @@ test('120-table fixture renders inside the cold budget and pans without long-tas
   await page.getByRole('button', { name: 'fit' }).click();
   await expect(page.locator('.table-node')).toHaveCount(PERF_TABLE_COUNT);
 
-  // Pan smoke: middle-button drag across the scene, starting over a table
-  // (pan-from-anywhere). Pan bypasses React — a long-task pileup here means
-  // the perf contract broke.
+  // Pan smoke: middle-button drag across the scene, starting at the scene
+  // center (pan-from-anywhere path — target-independent). Pan bypasses
+  // React — a long-task pileup here means the perf contract broke.
   await page.evaluate(() => {
-    (window as unknown as { __longTasks: number }).__longTasks = 0;
-    new PerformanceObserver((list) => {
-      (window as unknown as { __longTasks: number }).__longTasks += list.getEntries().length;
-    }).observe({ entryTypes: ['longtask'] });
+    const w = window as unknown as { __longTasks: number; __longTaskObs: PerformanceObserver };
+    w.__longTasks = 0;
+    w.__longTaskObs = new PerformanceObserver((list) => {
+      w.__longTasks += list.getEntries().length;
+    });
+    w.__longTaskObs.observe({ entryTypes: ['longtask'] });
   });
   const box = (await page.locator('svg.diagram-canvas').boundingBox())!;
   const cx = box.x + box.width / 2;
@@ -70,9 +75,11 @@ test('120-table fixture renders inside the cold budget and pans without long-tas
     await page.mouse.move(cx + i * 12, cy + (i % 5) * 8);
   }
   await page.mouse.up({ button: 'middle' });
-  const longTasks = await page.evaluate(
-    () => (window as unknown as { __longTasks: number }).__longTasks,
-  );
+  const longTasks = await page.evaluate(() => {
+    const w = window as unknown as { __longTasks: number; __longTaskObs: PerformanceObserver };
+    w.__longTaskObs.disconnect();
+    return w.__longTasks;
+  });
   // Ceiling 5: an incidental GC pause registers 1-2 entries; a React-per-
   // pan-tick regression registers dozens. Discriminating and CI-safe.
   expect(longTasks).toBeLessThanOrEqual(5);
