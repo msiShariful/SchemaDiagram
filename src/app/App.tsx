@@ -15,7 +15,7 @@ import { downloadText } from './export/download';
 import { safeFilename } from './export/exportCss';
 import { CanvasErrorBoundary } from './CanvasErrorBoundary';
 
-const THEME_KEY = 'dbdraft.theme';
+const THEME_KEY = 'dbdraft.theme'; // keep in sync with the inline FOUC guard in index.html
 type Theme = 'light' | 'dark';
 
 // Best-effort persistence — the app must never break because localStorage

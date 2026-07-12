@@ -21,6 +21,7 @@ export const MiniMap = memo(forwardRef<MiniMapHandle, Props>(function MiniMap({ 
   const positions = useAppStore((s) => s.positions);
   const viewRectEl = useRef<SVGRectElement>(null);
   const dragging = useRef(false);
+  const lastScrub = useRef<Point | null>(null); // last world center navTo computed (see pointercancel)
 
   const items = useMemo(
     () =>
@@ -63,7 +64,9 @@ export const MiniMap = memo(forwardRef<MiniMapHandle, Props>(function MiniMap({ 
     const tr = tRef.current;
     if (!tr) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    onNavigate(miniToWorld(tr, { x: e.clientX - rect.left, y: e.clientY - rect.top }), commit);
+    const center = miniToWorld(tr, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    lastScrub.current = center;
+    onNavigate(center, commit);
   };
 
   return (
@@ -86,7 +89,13 @@ export const MiniMap = memo(forwardRef<MiniMapHandle, Props>(function MiniMap({ 
         navTo(e, true);
       }}
       onPointerCancel={() => {
+        if (!dragging.current) return;
         dragging.current = false;
+        // Commit the LAST scrubbed center, not the cancel event's own
+        // coordinates — a touch-cancel can deliver clientX/Y of (0,0), which
+        // would jump the viewport across the scene. A cancelled drag must not
+        // leave the store viewport stale either (review-debt ledger item).
+        if (lastScrub.current) onNavigate(lastScrub.current, true);
       }}
     >
       {items.map((i) => {

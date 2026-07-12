@@ -3,6 +3,11 @@ import type { Rect, TablePosition } from '../core/model/types';
 export const GRID_SIZE = 16;
 export const SNAP_TOLERANCE = 6; // world units; callers divide by zoom for screen-constant feel
 
+/** Below this raw pointer travel (screen px), a canvas gesture is a click,
+ *  not a drag — shared by table drags (DiagramCanvas.handleLiveMove) and
+ *  note drags (NoteNode) so the two feel identical. */
+export const DRAG_THRESHOLD_PX = 3;
+
 export interface GuideLine {
   axis: 'x' | 'y'; // 'x' = vertical line at world x `at`
   at: number;

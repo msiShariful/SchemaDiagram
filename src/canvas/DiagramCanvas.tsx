@@ -7,7 +7,7 @@ import { TableNode } from './TableNode';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
-import { snapPosition, SNAP_TOLERANCE, type GuideLine } from './snap';
+import { snapPosition, SNAP_TOLERANCE, DRAG_THRESHOLD_PX, type GuideLine } from './snap';
 import { rectFromPoints, idsInRect } from './marquee';
 import { lodLevel } from './lod';
 import { visibleWorldRect } from './culling';
@@ -38,7 +38,15 @@ import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 //       across sibling instances of the same component: GroupLayer maps one
 //       onPointerMove closure over every group header, unlike TableNode/NoteNode,
 //       which get one component instance — and one private ref — per schema object.
-const DRAG_THRESHOLD_PX = 3; // below this raw pointer travel, a gesture is a click
+//   (d) pan ownership: Space+left / middle-button pan is armed in CAPTURE
+//       phase (onPointerDownCapture below), before any child's onPointerDown
+//       runs, and stops propagation — so the same press can never ALSO start
+//       a table/note/group drag underneath it. panRef/marqueeState each carry
+//       the owning pointerId; while one is set, a second pointer (a touch, or
+//       a chorded button) is ignored rather than hijacking or double-starting
+//       a gesture — this is also what keeps a mid-marquee middle-click from
+//       cancelling the marquee and starting a pan at the same time.
+// DRAG_THRESHOLD_PX lives in snap.ts (shared with NoteNode's own drag).
 
 interface DragState {
   id: string; // the table under the pointer
@@ -62,9 +70,9 @@ export function DiagramCanvas() {
   const noteDragRef = useRef<string | null>(null); // in-flight note drag (NoteNode writes it)
   const vpRef = useRef<Viewport>(useAppStore.getState().viewport);
   const zoomRef = useRef<number>(vpRef.current.zoom);
-  const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const panRef = useRef<{ pointerId: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const marqueeRef = useRef<SVGRectElement>(null);
-  const marqueeState = useRef<{ start: Point } | null>(null);
+  const marqueeState = useRef<{ pointerId: number; start: Point } | null>(null);
   const spaceDown = useRef(false);
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
   const [layoutBusy, setLayoutBusy] = useState(false);
@@ -340,32 +348,50 @@ export function DiagramCanvas() {
     return { x: (clientX - rect.left - x) / zoom, y: (clientY - rect.top - y) / zoom };
   };
 
-  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (e.target !== svgRef.current) return;
+  // Pan-from-anywhere (review-debt ledger): Space+left / middle-button must
+  // pan even when the pointer sits over a table, note, or group. Capture
+  // phase runs before any child's onPointerDown, and stopPropagation() here
+  // keeps the same gesture from ALSO starting a table/note/group drag.
+  // Gesture ownership: at most one canvas-level gesture (pan or marquee) at
+  // a time, keyed by pointerId — a second pointer (touch) or a chorded
+  // button press can neither hijack nor double-start a gesture.
+  const onPointerDownCapture = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (panRef.current || marqueeState.current) return; // a gesture already owns the canvas
     const wantPan = e.button === 1 || (e.button === 0 && spaceDown.current);
-    if (wantPan) {
-      e.preventDefault(); // best effort against middle-click autoscroll
-      svgRef.current!.setPointerCapture(e.pointerId);
-      panRef.current = { startX: e.clientX, startY: e.clientY, origX: vpRef.current.x, origY: vpRef.current.y };
-      return;
-    }
-    if (e.button !== 0) return;
+    if (!wantPan) return;
+    e.preventDefault(); // best effort against middle-click autoscroll
+    e.stopPropagation(); // don't let TableNode/NoteNode/GroupLayer start a drag
     svgRef.current!.setPointerCapture(e.pointerId);
-    marqueeState.current = { start: toWorld(e.clientX, e.clientY) };
+    panRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: vpRef.current.x,
+      origY: vpRef.current.y,
+    };
+  };
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.target !== svgRef.current) return; // marquee starts on empty canvas only
+    if (e.button !== 0) return;
+    if (panRef.current || marqueeState.current) return; // second pointer mid-gesture: ignore
+    svgRef.current!.setPointerCapture(e.pointerId);
+    marqueeState.current = { pointerId: e.pointerId, start: toWorld(e.clientX, e.clientY) };
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (panRef.current) {
+    const pan = panRef.current;
+    if (pan) {
+      if (e.pointerId !== pan.pointerId) return; // not the owning pointer
       vpRef.current = {
         ...vpRef.current,
-        x: panRef.current.origX + (e.clientX - panRef.current.startX),
-        y: panRef.current.origY + (e.clientY - panRef.current.startY),
+        x: pan.origX + (e.clientX - pan.startX),
+        y: pan.origY + (e.clientY - pan.startY),
       };
       applyTransform();
       return;
     }
     const m = marqueeState.current;
     const el = marqueeRef.current;
-    if (!m || !el) return;
+    if (!m || !el || e.pointerId !== m.pointerId) return;
     const r = rectFromPoints(m.start, toWorld(e.clientX, e.clientY));
     el.setAttribute('x', String(r.x));
     el.setAttribute('y', String(r.y));
@@ -374,14 +400,16 @@ export function DiagramCanvas() {
     el.setAttribute('visibility', 'visible');
   };
   const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (panRef.current) {
+    const pan = panRef.current;
+    if (pan) {
+      if (e.pointerId !== pan.pointerId) return;
       panRef.current = null;
       useAppStore.getState().setViewport(vpRef.current);
       setZoomPct(Math.round(vpRef.current.zoom * 100));
       return;
     }
     const m = marqueeState.current;
-    if (!m) return;
+    if (!m || e.pointerId !== m.pointerId) return;
     marqueeState.current = null;
     marqueeRef.current?.setAttribute('visibility', 'hidden');
     const sel = rectFromPoints(m.start, toWorld(e.clientX, e.clientY));
@@ -450,6 +478,7 @@ export function DiagramCanvas() {
       <svg
         ref={svgRef}
         className="diagram-canvas"
+        onPointerDownCapture={onPointerDownCapture}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
