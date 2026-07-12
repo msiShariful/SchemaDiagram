@@ -5,3 +5,7 @@ dist
 
 # agent worktrees
 .worktrees/
+
+# playwright
+test-results/
+playwright-report/

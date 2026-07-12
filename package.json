@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -26,6 +27,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
