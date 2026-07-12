@@ -78,3 +78,6 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .guide { stroke: var(--guide); stroke-width: 1; }
 .table-node.selected .table-body { stroke: var(--accent); stroke-width: 2; }
 .marquee { fill: var(--accent); fill-opacity: 0.08; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; }
+.table-box { fill: var(--table-header); stroke: var(--border); }
+.table-node.selected .table-box,
+.table-node.focused .table-box { stroke: var(--accent); stroke-width: 2; }

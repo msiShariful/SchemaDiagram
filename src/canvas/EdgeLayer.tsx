@@ -2,8 +2,8 @@ import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { useAppStore } from '../app/store';
 import { buildEdgeSpecs, type EdgeSpec } from '../core/layout/edges';
 import { routeEdge, pointsToPath } from '../core/layout/routing';
-import { getTableRect, fieldRowY } from '../core/model/geometry';
-import type { Table, TablePosition } from '../core/model/types';
+import { getTableRect, fieldRowY, rectsOverlap } from '../core/model/geometry';
+import type { Rect, Table, TablePosition } from '../core/model/types';
 
 export interface EdgeLayerHandle {
   updateTablePositions(overrides: Record<string, TablePosition>): void;
@@ -33,7 +33,11 @@ function edgePath(
   };
 }
 
-export const EdgeLayer = forwardRef<EdgeLayerHandle>(function EdgeLayer(_props, ref) {
+interface EdgeLayerProps {
+  viewRect: Rect | null;
+}
+
+export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function EdgeLayer({ viewRect }, ref) {
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const hoveredTableId = useAppStore((s) => s.hoveredTableId);
@@ -69,6 +73,19 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle>(function EdgeLayer(_props, 
   return (
     <g className="edge-layer">
       {specs.map((spec) => {
+        if (viewRect) {
+          const ft = tablesById.get(spec.fromTableId);
+          const tt = tablesById.get(spec.toTableId);
+          const fp = positions[spec.fromTableId];
+          const tp = positions[spec.toTableId];
+          if (
+            ft && tt && fp && tp &&
+            !rectsOverlap(getTableRect(ft, fp), viewRect) &&
+            !rectsOverlap(getTableRect(tt, tp), viewRect)
+          ) {
+            return null; // both endpoints offscreen (with margin) — skip
+          }
+        }
         const p = edgePath(spec, positions, tablesById);
         if (!p) return null;
         const hot =

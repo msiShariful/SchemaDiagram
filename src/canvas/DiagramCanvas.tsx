@@ -6,7 +6,9 @@ import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
 import { snapPosition, SNAP_TOLERANCE, type GuideLine } from './snap';
 import { rectFromPoints, idsInRect } from './marquee';
-import { getTableRect, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
+import { lodLevel } from './lod';
+import { visibleWorldRect } from './culling';
+import { getTableRect, rectsOverlap, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
 import { revealTable } from '../editor/editorNav';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
@@ -45,6 +47,26 @@ export function DiagramCanvas() {
   const editorFocusTableId = useAppStore((s) => s.editorFocusTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
+
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const svg = svgRef.current!;
+    const update = () => {
+      const r = svg.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(svg);
+    return () => ro.disconnect();
+  }, []);
+
+  // Safe to subscribe: pan commits on release and wheel commits 150 ms after
+  // the last tick (Task 5's debounced commit), so this re-render fires at
+  // gesture end / wheel idle — never per tick.
+  const viewport = useAppStore((s) => s.viewport);
+  const lod = lodLevel(viewport.zoom);
+  const viewRect = size.w > 0 ? visibleWorldRect(viewport, size.w, size.h) : null;
 
   // Registry of table <g> elements so multi-drag can move selection members
   // imperatively without querySelector or per-render closures.
@@ -334,14 +356,23 @@ export function DiagramCanvas() {
         onPointerCancel={onPointerUp}
       >
         <g ref={sceneRef}>
-          <EdgeLayer ref={edgeLayerRef} />
-          {schema.tables.map((t) =>
-            positions[t.id] ? (
+          <EdgeLayer ref={edgeLayerRef} viewRect={viewRect} />
+          {schema.tables.map((t) => {
+            const pos = positions[t.id];
+            if (!pos) return null;
+            // The actively-dragged table's <g> holds pointer capture for the
+            // gesture; unmounting it mid-drag (e.g. a wheel-zoom tick while a
+            // mouse button drag is in progress) would drop capture and strand
+            // the drag with no pointerup. Its own DOM element always stays.
+            const isDragAnchor = dragRef.current?.id === t.id;
+            if (viewRect && !isDragAnchor && !rectsOverlap(getTableRect(t, pos), viewRect)) return null;
+            return (
               <TableNode
                 key={t.id}
                 table={t}
-                pos={positions[t.id]}
+                pos={pos}
                 zoomRef={zoomRef}
+                lod={lod}
                 onLiveMove={handleLiveMove}
                 onCommitMove={handleCommitMove}
                 onHover={setHoveredTable}
@@ -350,8 +381,8 @@ export function DiagramCanvas() {
                 onOpenInEditor={revealTable}
                 registerEl={registerNodeEl}
               />
-            ) : null,
-          )}
+            );
+          })}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <rect ref={marqueeRef} className="marquee" visibility="hidden" vectorEffect="non-scaling-stroke" />
