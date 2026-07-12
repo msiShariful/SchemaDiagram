@@ -144,6 +144,20 @@ export function DiagramCanvas() {
   // (showGuides/hideGuides touch refs only, so the first-render closures
   // captured by the [] callbacks above stay correct.)
 
+  // A parse landing mid-gesture can prune/rename the dragged table; its DOM
+  // node is removed, so pointerup/pointercancel may never fire and the ledger
+  // + guide lines would go stale. `positions` changes exactly when a parse
+  // commits, so this effect is the single cleanup point — it runs on real
+  // re-renders only, never during the imperative drag path.
+  useEffect(() => {
+    if (dragRef.current && !positions[dragRef.current.id]) {
+      dragRef.current = null;
+      hideGuides();
+    }
+    // hideGuides touches refs only — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions]);
+
   // Canvas undo/redo shortcuts. The editor pane keeps CodeMirror history:
   // anything typed while focus is inside .cm-editor never reaches the canvas.
   useEffect(() => {

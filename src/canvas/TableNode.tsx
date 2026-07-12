@@ -55,6 +55,7 @@ export const TableNode = memo(function TableNode({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onLostPointerCapture={onPointerUp}
       onPointerEnter={() => onHover(table.id)}
       onPointerLeave={() => onHover(null)}
       onDoubleClick={() => onOpenInEditor(table.id)}
