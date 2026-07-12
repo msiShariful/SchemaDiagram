@@ -416,8 +416,9 @@ export function DiagramCanvas() {
       }));
       st.commitCanvasCommand({ label: 'auto-layout', tables, notes: [] });
       fit();
-    } catch {
+    } catch (err) {
       // layout unavailable (worker + fallback both failed) — positions untouched
+      window.alert(`Auto-layout failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLayoutBusy(false);
     }
