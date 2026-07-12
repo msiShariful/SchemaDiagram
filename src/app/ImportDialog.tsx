@@ -31,7 +31,15 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     if (!f) return;
     setErrors([]);
     setFileName(f.name);
-    setText(await f.text());
+    try {
+      setText(await f.text());
+    } catch (e) {
+      // File.text() can reject (file moved/deleted after picking, permission
+      // revoked, decode failure) — surface it in the dialog instead of the
+      // void'd promise swallowing it. No store/repo writes on this path.
+      setErrors([{ message: `Could not read file: ${e instanceof Error ? e.message : String(e)}`, line: 1, column: 1 }]);
+      return;
+    }
     if (/\.dbml$/i.test(f.name)) setKind('dbml');
     else if (/\.json$/i.test(f.name)) setKind('project');
   };
