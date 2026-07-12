@@ -17,6 +17,27 @@ import { runElkLayout } from '../core/layout/elkLayout';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 
+// Gesture ledger rules — shared by every per-schema-object drag on the canvas
+// (table, note, group; the minimap's viewport drag doesn't carry a
+// per-schema-object ledger so it's a simpler case). A parse can land
+// mid-gesture and delete the table/note/group being dragged, unmounting the
+// element that holds pointer capture with no pointerup ever firing. Each
+// implementation (TableNode, NoteNode, GroupLayer) independently has to
+// defend against the resulting "ghost gesture" — written down once here
+// instead of re-derived per component:
+//   (a) drag-anchor culling exemption: the render pass that culls
+//       off-screen/deleted elements reads the ledger ref (dragRef /
+//       noteDragRef / GroupLayer's own ref) at render time, so the actively
+//       dragged element always stays mounted even if it would otherwise be culled.
+//   (b) onLostPointerCapture routes to the same guarded pointerup handler as
+//       onPointerUp/onPointerCancel — losing capture (e.g. the element is
+//       removed from the DOM) must end the gesture exactly like a real pointerup.
+//   (c) move handlers bail when e.buttons === 0 — the backstop for when (b)
+//       doesn't fire (a detached element's lostpointercapture may never reach
+//       a listener), and the only defense when the ledger ref is shared
+//       across sibling instances of the same component: GroupLayer maps one
+//       onPointerMove closure over every group header, unlike TableNode/NoteNode,
+//       which get one component instance — and one private ref — per schema object.
 const DRAG_THRESHOLD_PX = 3; // below this raw pointer travel, a gesture is a click
 
 interface DragState {

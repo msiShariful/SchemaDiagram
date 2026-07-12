@@ -44,6 +44,14 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
   const onPointerMove = (e: React.PointerEvent<SVGGElement>) => {
     const d = drag.current;
     if (!d) return;
+    // drag is one ref shared by every group header in this component (unlike
+    // TableNode/NoteNode, which own a private ref per instance): a parse that
+    // deletes the dragged group unmounts its header without a pointerup, but
+    // GroupLayer itself lives on, so a later buttonless hover over ANY
+    // surviving header would otherwise resume this stale drag. onLostPointerCapture
+    // below covers the capture-loss case; this covers capture events that never
+    // reach the detached element's listener.
+    if (e.buttons === 0) { drag.current = null; return; }
     const zoom = zoomRef.current ?? 1;
     d.dx = (e.clientX - d.startX) / zoom;
     d.dy = (e.clientY - d.startY) / zoom;
@@ -73,6 +81,7 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
+              onLostPointerCapture={onPointerUp}
             >
               <rect x={rect.x} y={rect.y} width={rect.w} height={GROUP_HEADER_HEIGHT} rx={8} fill={color} fillOpacity={0.18} />
               <circle cx={rect.x + 12} cy={rect.y + GROUP_HEADER_HEIGHT / 2} r={5} fill={color} />
