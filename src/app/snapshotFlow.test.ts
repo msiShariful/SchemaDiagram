@@ -122,11 +122,14 @@ describe('snapshot + import persistence flows', () => {
     await putDiagram(a);
     useAppStore.getState().loadDiagram(a);
     useAppStore.getState().applyParse(parseDbml(BASE));
-    // A prior snapshot with the SAME text as the live diagram (e.g. taken
-    // right after this text was typed) — text-only dedupe would treat the
-    // live state as "unchanged" and skip the pre-restore checkpoint.
+    // The NEWEST snapshot has the SAME text as the live diagram (taken right
+    // after this text was typed) — text-only dedupe sees newest.dbml ===
+    // cur.dbml and skips the pre-restore checkpoint. takenAt 300 keeps it
+    // newest past `target` below: if an older-than-target snapshot held the
+    // matching text, target's differing text alone would force a checkpoint
+    // even under the old dedupe, and this test would pin nothing.
     const textMatch: DiagramSnapshot = {
-      id: 'snap-textmatch', diagramId: a.id, takenAt: 50, name: 'A',
+      id: 'snap-textmatch', diagramId: a.id, takenAt: 300, name: 'A',
       dbml: BASE, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     };
     await putSnapshot(textMatch);
