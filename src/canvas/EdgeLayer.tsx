@@ -37,6 +37,8 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle>(function EdgeLayer(_props, 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const hoveredTableId = useAppStore((s) => s.hoveredTableId);
+  const selectedTableIds = useAppStore((s) => s.selectedTableIds);
+  const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
   const pathRefs = useRef(new Map<string, SVGPathElement>());
 
   const specs = useMemo(() => buildEdgeSpecs(schema), [schema]);
@@ -69,7 +71,11 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle>(function EdgeLayer(_props, 
       {specs.map((spec) => {
         const p = edgePath(spec, positions, tablesById);
         if (!p) return null;
-        const hot = hoveredTableId === spec.fromTableId || hoveredTableId === spec.toTableId;
+        const hot =
+          hoveredTableId === spec.fromTableId ||
+          hoveredTableId === spec.toTableId ||
+          selectedSet.has(spec.fromTableId) ||
+          selectedSet.has(spec.toTableId);
         return (
           <g key={spec.id} className={`edge${hot ? ' hot' : ''}`}>
             <path

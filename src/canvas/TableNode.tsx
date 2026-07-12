@@ -10,12 +10,13 @@ interface Props {
   onCommitMove: (id: string) => void;
   onHover: (id: string | null) => void;
   focused: boolean;
+  selected: boolean;
   onOpenInEditor: (id: string) => void;
   registerEl: (id: string, el: SVGGElement | null) => void;
 }
 
 export const TableNode = memo(function TableNode({
-  table, pos, zoomRef, onLiveMove, onCommitMove, onHover, focused, onOpenInEditor, registerEl,
+  table, pos, zoomRef, onLiveMove, onCommitMove, onHover, focused, selected, onOpenInEditor, registerEl,
 }: Props) {
   const gRef = useRef<SVGGElement | null>(null);
   const drag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -50,7 +51,7 @@ export const TableNode = memo(function TableNode({
         registerEl(table.id, el);
       }}
       transform={`translate(${pos.x}, ${pos.y})`}
-      className={`table-node${focused ? ' focused' : ''}`}
+      className={`table-node${focused ? ' focused' : ''}${selected ? ' selected' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

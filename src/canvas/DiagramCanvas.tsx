@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
 import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
 import { TableNode } from './TableNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
 import { snapPosition, SNAP_TOLERANCE, type GuideLine } from './snap';
+import { rectFromPoints, idsInRect } from './marquee';
 import { getTableRect, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
 import { revealTable } from '../editor/editorNav';
 import type { PositionDelta } from '../core/layout/commands';
-import type { Rect, TablePosition, Viewport } from '../core/model/types';
+import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 
 const DRAG_THRESHOLD_PX = 3; // below this raw pointer travel, a gesture is a click
 
@@ -33,12 +34,17 @@ export function DiagramCanvas() {
   const vpRef = useRef<Viewport>(useAppStore.getState().viewport);
   const zoomRef = useRef<number>(vpRef.current.zoom);
   const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const marqueeRef = useRef<SVGRectElement>(null);
+  const marqueeState = useRef<{ start: Point } | null>(null);
+  const spaceDown = useRef(false);
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const setHoveredTable = useAppStore((s) => s.setHoveredTable);
   const editorFocusTableId = useAppStore((s) => s.editorFocusTableId);
+  const selectedTableIds = useAppStore((s) => s.selectedTableIds);
+  const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
 
   // Registry of table <g> elements so multi-drag can move selection members
   // imperatively without querySelector or per-render closures.
@@ -158,12 +164,23 @@ export function DiagramCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positions]);
 
-  // Canvas undo/redo shortcuts. The editor pane keeps CodeMirror history:
-  // anything typed while focus is inside .cm-editor never reaches the canvas.
+  // Canvas undo/redo shortcuts, Escape-to-clear-selection, and Space-hold
+  // pan-arming. The editor pane keeps CodeMirror history: anything typed
+  // while focus is inside .cm-editor never reaches the canvas.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.closest('.cm-editor') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'Escape') {
+        useAppStore.getState().setSelectedTables([]);
+        return;
+      }
+      if (e.key === ' ') {
+        // Don't hijack Space when a button has focus — it would both arm the
+        // pan AND re-activate the focused button (e.g. a zoom control).
+        if (!target?.closest('button')) spaceDown.current = true;
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey)) return;
       const key = e.key.toLowerCase();
       if (key === 'z') {
@@ -175,8 +192,15 @@ export function DiagramCanvas() {
         useAppStore.getState().redoCanvas();
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') spaceDown.current = false;
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, []);
 
   const applyTransform = () => {
@@ -222,25 +246,67 @@ export function DiagramCanvas() {
     };
   }, []);
 
+  const toWorld = (clientX: number, clientY: number): Point => {
+    const rect = svgRef.current!.getBoundingClientRect();
+    const { x, y, zoom } = vpRef.current;
+    return { x: (clientX - rect.left - x) / zoom, y: (clientY - rect.top - y) / zoom };
+  };
+
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0 || e.target !== svgRef.current) return;
+    if (e.target !== svgRef.current) return;
+    const wantPan = e.button === 1 || (e.button === 0 && spaceDown.current);
+    if (wantPan) {
+      e.preventDefault(); // best effort against middle-click autoscroll
+      svgRef.current!.setPointerCapture(e.pointerId);
+      panRef.current = { startX: e.clientX, startY: e.clientY, origX: vpRef.current.x, origY: vpRef.current.y };
+      return;
+    }
+    if (e.button !== 0) return;
     svgRef.current!.setPointerCapture(e.pointerId);
-    panRef.current = { startX: e.clientX, startY: e.clientY, origX: vpRef.current.x, origY: vpRef.current.y };
+    marqueeState.current = { start: toWorld(e.clientX, e.clientY) };
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!panRef.current) return;
-    vpRef.current = {
-      ...vpRef.current,
-      x: panRef.current.origX + (e.clientX - panRef.current.startX),
-      y: panRef.current.origY + (e.clientY - panRef.current.startY),
-    };
-    applyTransform();
+    if (panRef.current) {
+      vpRef.current = {
+        ...vpRef.current,
+        x: panRef.current.origX + (e.clientX - panRef.current.startX),
+        y: panRef.current.origY + (e.clientY - panRef.current.startY),
+      };
+      applyTransform();
+      return;
+    }
+    const m = marqueeState.current;
+    const el = marqueeRef.current;
+    if (!m || !el) return;
+    const r = rectFromPoints(m.start, toWorld(e.clientX, e.clientY));
+    el.setAttribute('x', String(r.x));
+    el.setAttribute('y', String(r.y));
+    el.setAttribute('width', String(r.w));
+    el.setAttribute('height', String(r.h));
+    el.setAttribute('visibility', 'visible');
   };
-  const onPointerUp = () => {
-    if (!panRef.current) return;
-    panRef.current = null;
-    useAppStore.getState().setViewport(vpRef.current);
-    setZoomPct(Math.round(vpRef.current.zoom * 100));
+  const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (panRef.current) {
+      panRef.current = null;
+      useAppStore.getState().setViewport(vpRef.current);
+      setZoomPct(Math.round(vpRef.current.zoom * 100));
+      return;
+    }
+    const m = marqueeState.current;
+    if (!m) return;
+    marqueeState.current = null;
+    marqueeRef.current?.setAttribute('visibility', 'hidden');
+    const sel = rectFromPoints(m.start, toWorld(e.clientX, e.clientY));
+    const store = useAppStore.getState();
+    const minSize = 4 / (zoomRef.current ?? 1); // tinier than this = a click on empty canvas
+    if (sel.w < minSize && sel.h < minSize) {
+      store.setSelectedTables([]);
+      return;
+    }
+    const items = store.schema.tables
+      .filter((t) => store.positions[t.id])
+      .map((t) => ({ id: t.id, rect: getTableRect(t, store.positions[t.id]) }));
+    store.setSelectedTables(idsInRect(items, sel));
   };
 
   const zoomBy = (factor: number) => {
@@ -280,6 +346,7 @@ export function DiagramCanvas() {
                 onCommitMove={handleCommitMove}
                 onHover={setHoveredTable}
                 focused={t.id === editorFocusTableId}
+                selected={selectedSet.has(t.id)}
                 onOpenInEditor={revealTable}
                 registerEl={registerNodeEl}
               />
@@ -287,6 +354,7 @@ export function DiagramCanvas() {
           )}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
+          <rect ref={marqueeRef} className="marquee" visibility="hidden" vectorEffect="non-scaling-stroke" />
         </g>
       </svg>
       <div className="zoom-controls">
