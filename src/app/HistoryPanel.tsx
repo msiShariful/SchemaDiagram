@@ -8,9 +8,17 @@ export function HistoryPanel() {
   const diagramId = useAppStore((s) => s.diagramId);
   const [open, setOpen] = useState(false);
   const [snaps, setSnaps] = useState<DiagramSnapshot[]>([]);
+  const [busy, setBusy] = useState(false);
 
   const refresh = (id: string) => {
-    void listSnapshots(id).then(setSnaps).catch(() => setSnaps([]));
+    // A fetch armed for a previous diagram can resolve AFTER the current
+    // one (switch with the panel open) — drop any settlement whose id no
+    // longer matches the live store instead of clobbering the list.
+    const fresh = () => useAppStore.getState().diagramId === id;
+    void listSnapshots(id).then(
+      (rows) => { if (fresh()) setSnaps(rows); },
+      () => { if (fresh()) setSnaps([]); },
+    );
   };
 
   useEffect(() => {
@@ -27,7 +35,10 @@ export function HistoryPanel() {
   const restore = (snap: DiagramSnapshot) => {
     // restoreSnapshot keeps the diagram id, so refreshing with the captured
     // id is safe; the pre-restore checkpoint shows up at the top of the list.
-    void restoreSnapshot(snap).then(() => refresh(snap.diagramId));
+    setBusy(true);
+    void restoreSnapshot(snap)
+      .then(() => refresh(snap.diagramId))
+      .finally(() => setBusy(false));
   };
 
   return (
@@ -46,7 +57,7 @@ export function HistoryPanel() {
                 <li key={s.id}>
                   <span className="when">{new Date(s.takenAt).toLocaleString()}</span>
                   <span className="history-meta">{s.dbml.length} chars</span>
-                  <button onClick={() => restore(s)}>restore</button>
+                  <button disabled={busy} onClick={() => restore(s)}>restore</button>
                 </li>
               ))}
             </ul>
