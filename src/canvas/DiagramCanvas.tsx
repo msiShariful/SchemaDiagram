@@ -485,8 +485,11 @@ export function DiagramCanvas() {
             );
           })}
           {schema.notes.map((n) => {
+            // Object.hasOwn, not a bare bracket read: a note named e.g. "toString"
+            // would otherwise shadow-read Object.prototype.toString (truthy, so
+            // `if (!pos)` wouldn't catch it) instead of missing the position lookup.
+            if (!Object.hasOwn(notePositions, n.id)) return null;
             const pos = notePositions[n.id];
-            if (!pos) return null;
             // Same drag-anchor exemption as tables: unmounting the note that
             // holds pointer capture would strand the drag with no pointerup.
             const isDragAnchor = noteDragRef.current === n.id;

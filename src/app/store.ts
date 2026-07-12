@@ -36,14 +36,17 @@ export function resetCanvasStack(): void {
 // in sync with the schema by that pass rather than by this filter.
 // Used by BOTH the commit path (a parse can land mid-drag: single,
 // multi-select, or group) and the undo/redo replay path.
+// Redo-after-recreate semantics are deliberate: the stack retains dead deltas rather
+// than pruning them on delete, and this filter re-admits revived ids, so an old undo
+// entry can end up moving a re-created same-id table — do not "fix" without a design decision.
 function filterToLive(
   s: Pick<AppState, 'positions' | 'notePositions'>,
   cmd: CanvasCommand,
 ): CanvasCommand {
   return {
     ...cmd,
-    tables: cmd.tables.filter((d) => d.id in s.positions),
-    notes: cmd.notes.filter((d) => d.id in s.notePositions),
+    tables: cmd.tables.filter((d) => Object.hasOwn(s.positions, d.id)),
+    notes: cmd.notes.filter((d) => Object.hasOwn(s.notePositions, d.id)),
   };
 }
 
@@ -119,7 +122,7 @@ export const useAppStore = create<AppState>()(
       const nextPositions = { ...kept, ...placed };
       const keptNotes: Record<string, TablePosition> = {};
       for (const n of result.schema.notes) {
-        if (notePositions[n.id]) keptNotes[n.id] = notePositions[n.id];
+        if (Object.hasOwn(notePositions, n.id)) keptNotes[n.id] = notePositions[n.id];
       }
       const occupied = result.schema.tables
         .filter((t) => nextPositions[t.id])

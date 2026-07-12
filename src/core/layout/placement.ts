@@ -88,7 +88,7 @@ export function placeNewNotes(
   ];
   const out: Record<string, TablePosition> = {};
   for (const note of schema.notes) {
-    if (notePositions[note.id]) continue;
+    if (Object.hasOwn(notePositions, note.id)) continue;
     const spot = gridScan(NOTE_WIDTH, NOTE_HEIGHT, placed);
     out[note.id] = spot;
     placed.push({ ...spot, w: NOTE_WIDTH, h: NOTE_HEIGHT });

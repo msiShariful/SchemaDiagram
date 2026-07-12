@@ -289,6 +289,23 @@ describe('sticky note positions', () => {
     expect(useAppStore.getState().notePositions.todo).toEqual(before);
   });
 
+  it('a note named "toString" gets a plain position object, not Object.prototype.toString', () => {
+    // Note ids are dot-free user-controlled keys (no schema prefix like tables),
+    // so a note named after an Object.prototype member is valid DBML and must
+    // not shadow-read the inherited function via a bare bracket/`in` lookup.
+    const src = "Table a { id int }\nNote toString {\n  'x'\n}";
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    const pos = useAppStore.getState().notePositions.toString;
+    expect(typeof pos).not.toBe('function');
+    expect(pos).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
+    // autosave-shaped serialization must not throw (would if pos were a function)
+    expect(() => JSON.stringify(useAppStore.getState().notePositions)).not.toThrow();
+    expect(() => structuredClone(useAppStore.getState().notePositions)).not.toThrow();
+    // stable across a second parse (reconcile path)
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    expect(useAppStore.getState().notePositions.toString).toEqual(pos);
+  });
+
   it('loadDiagram restores notePositions (defaulting to empty)', () => {
     useAppStore.getState().loadDiagram({
       id: 'd5', name: 'N', dbml: NOTE_SRC,
