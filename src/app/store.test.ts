@@ -166,6 +166,30 @@ describe('canvas command stack', () => {
     expect(st.notePositions.todo).toEqual({ x: 10, y: 10 });
   });
 
+  it('commit after a mid-gesture parse prune drops the pruned member, keeps survivors', () => {
+    seed();
+    const a = useAppStore.getState().positions['public.a'];
+    const b = useAppStore.getState().positions['public.b'];
+    // Parse lands mid-drag: table b deleted, reconcilePositions pruned its key.
+    const src2 = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(src2), src2);
+    // Gesture end still commits deltas for the whole moving set, b included.
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move group',
+      tables: [
+        { id: 'public.a', before: a, after: { x: a.x + 50, y: a.y + 50 } },
+        { id: 'public.b', before: b, after: { x: b.x + 50, y: b.y + 50 } },
+      ],
+      notes: [],
+    });
+    const st = useAppStore.getState();
+    expect(st.positions['public.b']).toBeUndefined(); // no phantom key resurrected
+    expect(st.positions['public.a']).toEqual({ x: a.x + 50, y: a.y + 50 });
+    useAppStore.getState().undoCanvas(); // survivors still round-trip
+    expect(useAppStore.getState().positions['public.a']).toEqual(a);
+    expect(useAppStore.getState().positions['public.b']).toBeUndefined();
+  });
+
   it('undo after a later edit deleted the table does not resurrect its position', () => {
     seed();
     const b = useAppStore.getState().positions['public.b'];

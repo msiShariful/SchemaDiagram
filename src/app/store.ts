@@ -22,23 +22,37 @@ export function resetCanvasStack(): void {
   canvasStack = createCommandStack();
 }
 
-// Undo/redo may replay a command whose table/note a later edit deleted;
-// applying that delta would resurrect a dead position key (autosaved until
-// the next clean parse prunes it). Apply only ids still tracked in the
-// current position maps. For tables this matches "still exists in the
-// schema": reconcilePositions() prunes `positions` to the live schema on
-// every successful parse, so a deleted table's key is already gone here.
-// Notes have no schema-backed existence yet (sticky-note parsing lands in a
-// later Plan 3 task — parseDbml's normalizer always emits `notes: []`), so
-// the notePositions map itself is the only source of truth available now.
+// A command may carry deltas for a table/note that a later (or mid-gesture)
+// parse deleted; applying such a delta would resurrect a dead position key
+// (autosaved until the next clean parse prunes it). Keep only ids still
+// tracked in the current position maps. For tables this matches "still
+// exists in the schema": reconcilePositions() prunes `positions` to the live
+// schema on every successful parse, so a deleted table's key is already gone
+// here. Notes have no schema-backed existence yet (sticky-note parsing lands
+// in a later Plan 3 task — parseDbml's normalizer always emits `notes: []`),
+// so the notePositions map itself is the only source of truth available now.
+// Used by BOTH the commit path (a parse can land mid-drag: single,
+// multi-select, or group) and the undo/redo replay path.
+function filterToLive(
+  s: Pick<AppState, 'positions' | 'notePositions'>,
+  cmd: CanvasCommand,
+): CanvasCommand {
+  return {
+    ...cmd,
+    tables: cmd.tables.filter((d) => d.id in s.positions),
+    notes: cmd.notes.filter((d) => d.id in s.notePositions),
+  };
+}
+
 function applyCommandSide(
   s: Pick<AppState, 'positions' | 'notePositions'>,
   cmd: CanvasCommand,
   key: 'before' | 'after',
 ): Pick<AppState, 'positions' | 'notePositions'> {
+  const live = filterToLive(s, cmd);
   return {
-    positions: applyDeltas(s.positions, cmd.tables.filter((d) => d.id in s.positions), key),
-    notePositions: applyDeltas(s.notePositions, cmd.notes.filter((d) => d.id in s.notePositions), key),
+    positions: applyDeltas(s.positions, live.tables, key),
+    notePositions: applyDeltas(s.notePositions, live.notes, key),
   };
 }
 
@@ -113,7 +127,10 @@ export const useAppStore = create<AppState>()(
     moveTable: (id, pos) => set((s) => ({ positions: { ...s.positions, [id]: pos } })),
 
     commitCanvasCommand: (raw) => {
-      const cmd = pruneZeroDeltas(raw);
+      // filterToLive first: a parse landing mid-gesture can prune a member's
+      // position; committing its delta anyway would resurrect the dead key.
+      // An all-pruned command falls through to the no-op guard below.
+      const cmd = pruneZeroDeltas(filterToLive(get(), raw));
       if (isNoopCommand(cmd)) return; // zero-delta guard: no state change, no history entry
       canvasStack.push(cmd);
       set((s) => ({
