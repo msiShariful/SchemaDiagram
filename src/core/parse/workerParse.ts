@@ -4,26 +4,40 @@ import type { ParseResult } from './parseDbml';
 // chunk just to cover the rare paths below (no-Worker environments, or a
 // worker that has died). The worker chunk (parser.worker.ts) still imports
 // parseDbml eagerly/statically — that's the hot path and always needs it.
-const loadParser = () => import('./parseDbml');
+type ParserModule = { parseDbml: (source: string) => ParseResult };
+const defaultLoadParser = (): Promise<ParserModule> => import('./parseDbml');
+
+export const PARSER_UNAVAILABLE_MESSAGE =
+  'DBML parser unavailable — its code chunk failed to load. Check your connection and reload.';
+
+const PARSER_UNAVAILABLE: ParseResult = {
+  ok: false,
+  errors: [{ message: PARSER_UNAVAILABLE_MESSAGE, line: 1, column: 1 }],
+};
 
 export interface WorkerParseAdapter {
   parse(source: string): Promise<ParseResult>;
   dispose(): void;
 }
 
-export function createWorkerParse(): WorkerParseAdapter {
+export function createWorkerParse(
+  loadParser: () => Promise<ParserModule> = defaultLoadParser,
+): WorkerParseAdapter {
+  // Every in-thread parse funnels through here. A failed lazy-chunk load
+  // (offline, a deploy rotated the hashed assets) settles as a normal
+  // {ok:false} ParseResult: parse errors are the pipeline's ordinary
+  // currency, so the canvas keeps the last good schema and the problems
+  // panel explains what happened — never an unhandled rejection, never a
+  // promise left pending forever.
+  const inThread = (source: string): Promise<ParseResult> =>
+    loadParser().then(({ parseDbml }) => parseDbml(source), () => PARSER_UNAVAILABLE);
+
   let worker: Worker;
   try {
     worker = new Worker(new URL('./parser.worker.ts', import.meta.url), { type: 'module' });
   } catch {
     // No Worker support → in-thread for the lifetime of this adapter.
-    return {
-      parse: async (source) => {
-        const { parseDbml } = await loadParser();
-        return parseDbml(source);
-      },
-      dispose() {},
-    };
+    return { parse: inThread, dispose() {} };
   }
 
   let nextId = 0;
@@ -36,13 +50,9 @@ export function createWorkerParse(): WorkerParseAdapter {
   const shutdown = () => {
     if (dead) return;
     dead = true;
-    if (pending.size > 0) {
-      void loadParser().then(({ parseDbml }) => {
-        for (const [id, p] of pending) {
-          p.resolve(parseDbml(p.source));
-          pending.delete(id);
-        }
-      });
+    for (const [id, p] of pending) {
+      void inThread(p.source).then(p.resolve);
+      pending.delete(id);
     }
     worker.terminate();
   };
@@ -59,7 +69,7 @@ export function createWorkerParse(): WorkerParseAdapter {
 
   return {
     parse(source) {
-      if (dead) return loadParser().then(({ parseDbml }) => parseDbml(source));
+      if (dead) return inThread(source);
       return new Promise<ParseResult>((resolve) => {
         const id = nextId++;
         pending.set(id, { source, resolve });

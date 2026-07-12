@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createWorkerParse } from './workerParse';
+import { createWorkerParse, PARSER_UNAVAILABLE_MESSAGE } from './workerParse';
 import type { ParseResult } from './parseDbml';
 
 describe('createWorkerParse (fallback path, no Worker global)', () => {
@@ -135,5 +135,45 @@ describe('createWorkerParse (worker path, fake Worker)', () => {
     second.instance.onerror?.();
     second.adapter.dispose();
     expect(second.instance.terminateCount).toBe(1);
+  });
+});
+
+describe('createWorkerParse (lazy parser chunk fails to load)', () => {
+  // Simulates the deployed-hash-rotated / offline case: import('./parseDbml')
+  // rejects. Every fallback path must settle as {ok:false, parser unavailable}
+  // — never an unhandled rejection, never a promise pending forever.
+  const failingLoader = () => Promise.reject(new Error('chunk load failed'));
+  const unavailable = {
+    ok: false,
+    errors: [{ message: PARSER_UNAVAILABLE_MESSAGE, line: 1, column: 1 }],
+  };
+
+  it('no-Worker fallback resolves {ok:false, parser unavailable} instead of rejecting', async () => {
+    const adapter = createWorkerParse(failingLoader); // node: no Worker global
+    await expect(adapter.parse('Table a { id int }')).resolves.toEqual(unavailable);
+  });
+
+  it('dispose() with requests in flight settles them as parser-unavailable', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    try {
+      const adapter = createWorkerParse(failingLoader);
+      const inFlight = adapter.parse('Table a { id int }');
+      adapter.dispose();
+      await expect(inFlight).resolves.toEqual(unavailable);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('postMessage failure with a broken loader still resolves {ok:false}', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    try {
+      const adapter = createWorkerParse(failingLoader);
+      const instance = FakeWorker.instances[FakeWorker.instances.length - 1];
+      instance.throwOnPost = true;
+      await expect(adapter.parse('Table a { id int }')).resolves.toEqual(unavailable);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
