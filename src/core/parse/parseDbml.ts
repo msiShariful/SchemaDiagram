@@ -1,5 +1,7 @@
 import { Parser } from '@dbml/core';
-import type { Schema, Table, Field, Ref, RefEndpoint, EnumDef, Relation } from '../model/types';
+import type {
+  Schema, Table, Field, Ref, RefEndpoint, EnumDef, Relation, TableGroup, StickyNote,
+} from '../model/types';
 
 export interface ParseError { message: string; line: number; column: number; }
 export type ParseResult = { ok: true; schema: Schema } | { ok: false; errors: ParseError[] };
@@ -69,7 +71,38 @@ function normalizeDatabase(db: any): Schema {
       }
     }
   }
-  return { tables, refs, enums, groups: [], notes: [] }; // groups/notes normalized in Plan 3 (canvas depth)
+  const groups: TableGroup[] = [];
+  for (const schema of db.schemas ?? []) {
+    const schemaName: string = schema.name ?? 'public';
+    for (const tg of schema.tableGroups ?? []) {
+      groups.push({
+        id: `${schemaName}.${tg.name}`,
+        name: String(tg.name),
+        color: tg.color ?? null,
+        tableIds: (tg.tables ?? []).map((t: any) => {
+          const tSchema = t.schemaName ?? t.schema?.name ?? schemaName;
+          const tName = t.tableName ?? t.name;
+          return `${tSchema}.${tName}`;
+        }),
+      });
+    }
+  }
+
+  // Standalone `Note name { '...' }` blocks. 8.3 exposes them on the database
+  // object; scan the per-schema slot too and dedupe by name so we adapt to
+  // either placement without double-emitting.
+  const noteById = new Map<string, StickyNote>();
+  const rawNotes: any[] = [
+    ...(db.notes ?? []),
+    ...(db.schemas ?? []).flatMap((s: any) => s.notes ?? []),
+  ];
+  for (const n of rawNotes) {
+    const name = String(n?.name ?? '');
+    if (!name || noteById.has(name)) continue;
+    noteById.set(name, { id: name, name, content: n.content != null ? String(n.content) : '' });
+  }
+
+  return { tables, refs, enums, groups, notes: [...noteById.values()] };
 }
 
 function normalizeErrors(e: unknown): ParseError[] {

@@ -70,3 +70,35 @@ describe('parseDbml', () => {
     expect(r.schema.tables).toEqual([]);
   });
 });
+
+describe('table groups and sticky notes', () => {
+  it('normalizes a TableGroup with members and color', () => {
+    const r = parseDbml(
+      'Table a { id int }\nTable b { id int }\nTableGroup core [color: #1e69de] {\n  a\n  b\n}',
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.schema.groups).toHaveLength(1);
+    const g = r.schema.groups[0];
+    expect(g.id).toBe('public.core');
+    expect(g.name).toBe('core');
+    expect(g.tableIds).toEqual(['public.a', 'public.b']);
+    expect((g.color ?? '').toLowerCase()).toBe('#1e69de');
+  });
+
+  it('normalizes a standalone Note block', () => {
+    const r = parseDbml("Table a { id int }\nNote todo {\n  'ship the canvas'\n}");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.schema.notes).toHaveLength(1);
+    expect(r.schema.notes[0]).toEqual({ id: 'todo', name: 'todo', content: 'ship the canvas' });
+  });
+
+  it('emits empty groups and notes when the source has none', () => {
+    const r = parseDbml('Table a { id int }');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.schema.groups).toEqual([]);
+    expect(r.schema.notes).toEqual([]);
+  });
+});
