@@ -22,10 +22,12 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // Gate on !busy: closing while an import is in flight lets it land
+    // after the dialog (and its error surface) is already gone.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, busy]);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
@@ -86,7 +88,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={() => { if (!busy) onClose(); }}>
       <div className="dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h3>Import — creates a new diagram</h3>
         <div className="dialog-row">
@@ -117,7 +119,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           </ul>
         )}
         <div className="dialog-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button disabled={busy} onClick={onClose}>Cancel</button>
           <button className="primary" disabled={busy} onClick={() => void runImport()}>
             {busy ? 'Importing…' : 'Import as new diagram'}
           </button>
