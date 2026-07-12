@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DbmlEditor } from '../editor/DbmlEditor';
 import { DiagramCanvas } from '../canvas/DiagramCanvas';
 import { useParsePipeline } from './useParsePipeline';
@@ -8,6 +9,7 @@ import { SplitPane } from './SplitPane';
 import { ProblemsPanel } from './ProblemsPanel';
 import { applyFormat } from '../editor/editorNav';
 import { ExportMenu } from './ExportMenu';
+import { ImportDialog } from './ImportDialog';
 import { downloadText } from './export/download';
 import { safeFilename } from './export/exportCss';
 
@@ -18,12 +20,14 @@ export function App() {
   const errors = useAppStore((s) => s.errors);
   const tableCount = useAppStore((s) => s.schema.tables.length);
   const storageUnavailable = useAppStore((s) => s.storageUnavailable);
+  const [importOpen, setImportOpen] = useState(false);
 
   return (
     <div className="app-shell">
       <header className="toolbar">
         <span className="brand">DBDraft</span>
         <DiagramManager />
+        <button onClick={() => setImportOpen(true)}>Import</button>
         <button
           className="format-button"
           disabled={stale || errors.length > 0}
@@ -57,6 +61,7 @@ export function App() {
         </span>
         <span className="status-dim">{tableCount} tables</span>
       </footer>
+      {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
     </div>
   );
 }
