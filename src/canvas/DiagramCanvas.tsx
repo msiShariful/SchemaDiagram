@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
 import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
+import { MiniMap, type MiniMapHandle } from './MiniMap';
 import { TableNode } from './TableNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -29,6 +30,7 @@ export function DiagramCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const sceneRef = useRef<SVGGElement>(null);
   const edgeLayerRef = useRef<EdgeLayerHandle>(null);
+  const minimapRef = useRef<MiniMapHandle>(null);
   const guideXRef = useRef<SVGLineElement>(null);
   const guideYRef = useRef<SVGLineElement>(null);
   const nodeEls = useRef(new Map<string, SVGGElement>());
@@ -229,6 +231,7 @@ export function DiagramCanvas() {
     const { x, y, zoom } = vpRef.current;
     zoomRef.current = zoom;
     sceneRef.current?.setAttribute('transform', `translate(${x}, ${y}) scale(${zoom})`);
+    minimapRef.current?.updateViewport(vpRef.current);
   };
 
   useLayoutEffect(() => {
@@ -331,6 +334,17 @@ export function DiagramCanvas() {
     store.setSelectedTables(idsInRect(items, sel));
   };
 
+  const handleMinimapNav = useCallback((center: Point, commit: boolean) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const zoom = vpRef.current.zoom;
+    vpRef.current = { zoom, x: rect.width / 2 - center.x * zoom, y: rect.height / 2 - center.y * zoom };
+    applyTransform();
+    if (commit) useAppStore.getState().setViewport(vpRef.current);
+  }, []);
+  // (applyTransform touches refs only; the first-render closure stays correct.)
+
   const zoomBy = (factor: number) => {
     const svg = svgRef.current!;
     const rect = svg.getBoundingClientRect();
@@ -388,6 +402,7 @@ export function DiagramCanvas() {
           <rect ref={marqueeRef} className="marquee" visibility="hidden" vectorEffect="non-scaling-stroke" />
         </g>
       </svg>
+      <MiniMap ref={minimapRef} viewSize={size} onNavigate={handleMinimapNav} />
       <div className="zoom-controls">
         <button onClick={() => zoomBy(1.2)}>+</button>
         <button onClick={() => zoomBy(1 / 1.2)}>−</button>

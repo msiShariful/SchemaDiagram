@@ -73,6 +73,13 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .problems-list { list-style: none; margin: 0; padding: 0 0 4px; max-height: 110px; overflow-y: auto; }
 .problems-list button { border: none; background: none; cursor: pointer; padding: 2px 16px; width: 100%; text-align: left; }
 .problems-list button:hover { background: #ffecec; }
+.minimap {
+  position: absolute; right: 12px; bottom: 52px; display: block;
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+  opacity: 0.92; cursor: pointer;
+}
+.minimap-table { fill: var(--table-header); }
+.minimap-view { fill: var(--accent); fill-opacity: 0.15; stroke: var(--accent); stroke-width: 1; }
 .problem-loc { color: var(--text-dim); font-family: ui-monospace, monospace; margin-right: 6px; }
 .table-node.focused .table-body { stroke: var(--accent); stroke-width: 2; }
 .guide { stroke: var(--guide); stroke-width: 1; }
