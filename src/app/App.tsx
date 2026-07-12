@@ -9,6 +9,7 @@ import { SplitPane } from './SplitPane';
 import { ProblemsPanel } from './ProblemsPanel';
 import { applyFormat } from '../editor/editorNav';
 import { ExportMenu } from './ExportMenu';
+import { HistoryPanel } from './HistoryPanel';
 import { ImportDialog } from './ImportDialog';
 import { downloadText } from './export/download';
 import { safeFilename } from './export/exportCss';
@@ -37,6 +38,7 @@ export function App() {
           Format
         </button>
         <ExportMenu />
+        <HistoryPanel />
         {stale && <span className="badge stale">diagram out of date</span>}
       </header>
       {storageUnavailable && (
