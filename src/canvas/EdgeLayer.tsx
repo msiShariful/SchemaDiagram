@@ -6,7 +6,7 @@ import { getTableRect, fieldRowY } from '../core/model/geometry';
 import type { Table, TablePosition } from '../core/model/types';
 
 export interface EdgeLayerHandle {
-  updateTablePosition(id: string, pos: TablePosition): void;
+  updateTablePositions(overrides: Record<string, TablePosition>): void;
 }
 
 function edgePath(
@@ -51,9 +51,13 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle>(function EdgeLayer(_props, 
   }, [specs]);
 
   useImperativeHandle(ref, () => ({
-    updateTablePosition(id, pos) {
-      const live = { ...positions, [id]: pos };
-      for (const spec of specsByTable.get(id) ?? []) {
+    updateTablePositions(overrides) {
+      const live = { ...positions, ...overrides };
+      const touched = new Set<EdgeSpec>();
+      for (const id of Object.keys(overrides)) {
+        for (const s of specsByTable.get(id) ?? []) touched.add(s);
+      }
+      for (const spec of touched) {
         const p = edgePath(spec, live, tablesById);
         if (p) pathRefs.current.get(spec.id)?.setAttribute('d', p.d);
       }

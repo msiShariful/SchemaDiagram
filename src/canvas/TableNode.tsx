@@ -6,45 +6,49 @@ interface Props {
   table: Table;
   pos: TablePosition;
   zoomRef: React.RefObject<number>;
-  onLiveMove: (id: string, pos: TablePosition) => void;
-  onCommitMove: (id: string, pos: TablePosition) => void;
+  onLiveMove: (id: string, raw: TablePosition) => TablePosition;
+  onCommitMove: (id: string) => void;
   onHover: (id: string | null) => void;
   focused: boolean;
   onOpenInEditor: (id: string) => void;
+  registerEl: (id: string, el: SVGGElement | null) => void;
 }
 
-export const TableNode = memo(function TableNode({ table, pos, zoomRef, onLiveMove, onCommitMove, onHover, focused, onOpenInEditor }: Props) {
-  const gRef = useRef<SVGGElement>(null);
-  const drag = useRef<{ startX: number; startY: number; origX: number; origY: number; live: TablePosition } | null>(null);
+export const TableNode = memo(function TableNode({
+  table, pos, zoomRef, onLiveMove, onCommitMove, onHover, focused, onOpenInEditor, registerEl,
+}: Props) {
+  const gRef = useRef<SVGGElement | null>(null);
+  const drag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const h = tableHeight(table.fields.length);
 
   const onPointerDown = (e: React.PointerEvent<SVGGElement>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
-    drag.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, live: pos };
+    drag.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
   };
   const onPointerMove = (e: React.PointerEvent<SVGGElement>) => {
     if (!drag.current) return;
     const zoom = zoomRef.current ?? 1;
-    const live = {
+    const raw = {
       x: drag.current.origX + (e.clientX - drag.current.startX) / zoom,
       y: drag.current.origY + (e.clientY - drag.current.startY) / zoom,
     };
-    drag.current.live = live;
-    gRef.current?.setAttribute('transform', `translate(${live.x}, ${live.y})`);
-    onLiveMove(table.id, live);
+    const snapped = onLiveMove(table.id, raw);
+    gRef.current?.setAttribute('transform', `translate(${snapped.x}, ${snapped.y})`);
   };
   const onPointerUp = () => {
     if (!drag.current) return;
-    const { live } = drag.current;
     drag.current = null;
-    onCommitMove(table.id, live);
+    onCommitMove(table.id);
   };
 
   return (
     <g
-      ref={gRef}
+      ref={(el) => {
+        gRef.current = el;
+        registerEl(table.id, el);
+      }}
       transform={`translate(${pos.x}, ${pos.y})`}
       className={`table-node${focused ? ' focused' : ''}`}
       onPointerDown={onPointerDown}

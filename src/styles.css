@@ -9,6 +9,7 @@
   --edge: #8a93a3;
   --edge-hover: #2f6fed;
   --error: #d33;
+  --guide: #e0407f;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -74,3 +75,4 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .problems-list button:hover { background: #ffecec; }
 .problem-loc { color: var(--text-dim); font-family: ui-monospace, monospace; margin-right: 6px; }
 .table-node.focused .table-body { stroke: var(--accent); stroke-width: 2; }
+.guide { stroke: var(--guide); stroke-width: 1; }
