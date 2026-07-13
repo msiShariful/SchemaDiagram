@@ -135,7 +135,15 @@ describe('snapshot + import persistence flows', () => {
     await putSnapshot(textMatch);
     // Layout has since drifted (a drag/pan) without a text change — drag/pan
     // never snapshots on its own, so this state was never captured.
-    useAppStore.getState().moveTable('public.a', { x: 999, y: 111 });
+    // commitCanvasCommand (not moveTable, retired — no non-test caller) moves
+    // it the same way a real drag commit would; snapshots only happen on
+    // autosave, so this alone doesn't create one.
+    const beforePos = useAppStore.getState().positions['public.a'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table',
+      tables: [{ id: 'public.a', before: beforePos, after: { x: 999, y: 111 } }],
+      notes: [],
+    });
     useAppStore.getState().setViewport({ x: 7, y: 8, zoom: 2 });
 
     const target: DiagramSnapshot = {

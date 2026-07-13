@@ -290,11 +290,17 @@ export function DiagramCanvas() {
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === ' ') spaceDown.current = false;
     };
+    // A window blur while Space is held (alt-tab, devtools focus, etc.) never
+    // fires keyup — without this, spaceDown sticks true and the next
+    // left-click pans instead of selecting/dragging.
+    const onBlur = () => { spaceDown.current = false; };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     };
   }, []);
 

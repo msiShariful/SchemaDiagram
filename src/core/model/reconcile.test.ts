@@ -41,4 +41,19 @@ describe('reconcilePositions', () => {
     const transferred = ['public.members', 'public.people'].filter((id) => out[id]);
     expect(transferred).toHaveLength(1);
   });
+
+  it('does not throw on a corrupted table with fields: undefined, and its signature stays stable', () => {
+    // A corrupted table object (e.g. a bad parse or manual store mutation)
+    // must not throw uncaught outside the error boundary — signature() guards
+    // with `?? []`, treating missing fields as an empty field set.
+    const corrupted = { ...mkTable('a', []), fields: undefined } as unknown as Table;
+    const prev = mkSchema([corrupted]);
+    const next = mkSchema([mkTable('empty', [])]); // same (empty) signature as the corrupted table
+    const positions = { 'public.a': { x: 1, y: 2 } };
+    expect(() => reconcilePositions(prev, next, positions)).not.toThrow();
+    const out1 = reconcilePositions(prev, next, positions);
+    const out2 = reconcilePositions(prev, next, positions);
+    expect(out1).toEqual(out2); // stable signature: repeat calls agree
+    expect(out1['public.empty']).toEqual({ x: 1, y: 2 }); // treated as empty-fields signature, so it still transfers
+  });
 });

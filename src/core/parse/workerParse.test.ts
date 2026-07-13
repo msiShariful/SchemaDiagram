@@ -27,18 +27,25 @@ type WorkerResponse = { id: number; result: ParseResult };
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
+  // Set before a spawn you expect to happen next (e.g. right before the crash
+  // that triggers a restart) — read once by the constructor, then cleared.
+  static throwOnNthPostForNext: number | null = null;
   onmessage: ((e: { data: WorkerResponse }) => void) | null = null;
   onerror: (() => void) | null = null;
   posted: WorkerRequest[] = [];
   terminateCount = 0;
   throwOnPost = false;
+  throwOnNthPost: number | null = null; // 1-indexed postMessage call to throw on
 
   constructor() {
+    this.throwOnNthPost = FakeWorker.throwOnNthPostForNext;
+    FakeWorker.throwOnNthPostForNext = null;
     FakeWorker.instances.push(this);
   }
 
   postMessage(msg: WorkerRequest): void {
     if (this.throwOnPost) throw new Error('postMessage failed');
+    if (this.throwOnNthPost === this.posted.length + 1) throw new Error('postMessage failed on nth call');
     this.posted.push(msg);
   }
 
@@ -87,6 +94,25 @@ describe('createWorkerParse (worker path, fake Worker)', () => {
     expect(second.posted).toEqual([{ id: 1, source: 'Table a { id int }' }]); // re-posted
     second.onmessage?.({ data: { id: 1, result: okResult } });
     await expect(p).resolves.toBe(okResult);
+  });
+
+  it('a postMessage throw partway through the restart re-post loop settles every entry instead of hanging one', async () => {
+    // Three entries pending when the worker crashes. The fresh worker throws
+    // on its 2nd postMessage (the re-post of entry #2), which shuts the
+    // adapter down mid-loop. Without the dead-guard, entry #3 would still be
+    // posted to that now-terminated worker and never resolve.
+    const { adapter, instance } = spawn();
+    const p1 = adapter.parse('Table a { id int }');
+    const p2 = adapter.parse('Table b { id int }');
+    const p3 = adapter.parse('Table c { id int }');
+    FakeWorker.throwOnNthPostForNext = 2;
+    instance.onerror?.(); // crash: restart re-posts all three entries on the fresh worker
+    const w2 = FakeWorker.instances[FakeWorker.instances.length - 1];
+    expect(w2.posted).toHaveLength(1); // only the 1st re-post reached postMessage before the throw
+    expect(w2.terminateCount).toBe(1); // the throw shut the fresh worker down too
+    await expect(p1).resolves.toMatchObject({ ok: true });
+    await expect(p2).resolves.toMatchObject({ ok: true });
+    await expect(p3).resolves.toMatchObject({ ok: true }); // the entry the bug would have stranded
   });
 
   it('two consecutive crashes on identical input resolve with the inline crash error, nothing auto-retried', async () => {

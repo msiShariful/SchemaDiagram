@@ -120,7 +120,15 @@ export function createWorkerParse(
     worker = next;
     wire(worker);
     if (decision.action === 'restart') {
-      for (const p of entries) post(p); // re-parse once on the fresh worker
+      // A postMessage throw partway through this loop calls shutdown() and
+      // sets dead=true (via post()'s catch). Without this guard, later
+      // entries would still be posted to the now-terminated worker — no
+      // onmessage/onerror will ever fire for them, so they'd hang forever
+      // instead of settling. Once dead, route straight to inThread.
+      for (const p of entries) {
+        if (dead) void inThread(p.source).then(p.resolve);
+        else post(p); // re-parse once on the fresh worker
+      }
     }
   }
 

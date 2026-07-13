@@ -1,7 +1,7 @@
 import type { Schema, Table, TablePosition } from './types';
 
 function signature(t: Table): string {
-  return `${t.schemaName}|${[...t.fields.map((f) => f.name)].sort().join(',')}`;
+  return `${t.schemaName}|${[...(t.fields ?? []).map((f) => f.name)].sort().join(',')}`;
 }
 
 export function reconcilePositions(

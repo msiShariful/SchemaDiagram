@@ -42,7 +42,12 @@ describe('useAppStore', () => {
     const src1 = 'Table a { id int }';
     const src2 = 'Table a { id int }\nTable b { id int }';
     useAppStore.getState().applyParse(parseDbml(src1), src1);
-    useAppStore.getState().moveTable('public.a', { x: 777, y: 333 });
+    const before = useAppStore.getState().positions['public.a'];
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table',
+      tables: [{ id: 'public.a', before, after: { x: 777, y: 333 } }],
+      notes: [],
+    });
     useAppStore.getState().applyParse(parseDbml(src2), src2);
     expect(useAppStore.getState().positions['public.a']).toEqual({ x: 777, y: 333 });
   });

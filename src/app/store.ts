@@ -79,7 +79,6 @@ interface AppState {
   selectedTableIds: string[];
   setSource(source: string): void;
   applyParse(result: ParseResult, source: string): void;
-  moveTable(id: string, pos: TablePosition): void;
   setViewport(v: Viewport): void;
   setHoveredTable(id: string | null): void;
   setEditorFocusTable(editorFocusTableId: string | null): void;
@@ -139,8 +138,6 @@ export const useAppStore = create<AppState>()(
         parsedSource: source,
       });
     },
-
-    moveTable: (id, pos) => set((s) => ({ positions: { ...s.positions, [id]: pos } })),
 
     commitCanvasCommand: (raw) => {
       // filterToLive first: a parse landing mid-gesture can prune a member's
