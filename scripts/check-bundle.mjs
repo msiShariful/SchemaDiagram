@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-// Bundle budget guard (Plan 5). Fails the build when the main chunk exceeds
-// the gzip budget or when a lazy-only library's marker strings leak into it.
+// Bundle budget guard (Plan 5; budget raised in Plan 7). Fails the build when
+// the main chunk exceeds the gzip budget or when a lazy-only library's marker
+// strings leak into it.
 //
-// Budget rationale: CLAUDE.md pins the main chunk at ~210 kB gzip; the
-// Plan 3+4 merge measured 208.37 kB. 210 KiB (215,040 bytes) leaves ~6 kB
-// headroom for small UI additions, while an accidental static import of
-// @dbml/core (~2.7 MB chunk) or elk.bundled (~1.4 MB) overshoots by an
-// order of magnitude — and the marker check names the culprit even when
-// minification shifts sizes.
+// Budget rationale: Plan 7 raised the ceiling 210 → 230 KiB (controller-
+// approved): six → seven feature plans of deliberate UI growth had the entry
+// chunk at 211,396 bytes with ~3.6 KiB headroom. The gate exists to catch
+// ACCIDENTAL heavyweight imports — a static @dbml/core (~2.7 MB chunk) or
+// elk.bundled (~1.4 MB) overshoots any sane budget by an order of magnitude,
+// and the marker check below names the culprit even when minification shifts
+// sizes — not to cap deliberate feature growth.
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
 const raw = process.env.BUNDLE_BUDGET;
-const BUDGET_BYTES = raw === undefined ? 210 * 1024 : Number(raw);
+const BUDGET_BYTES = raw === undefined ? 230 * 1024 : Number(raw);
 if (Number.isNaN(BUDGET_BYTES)) {
   console.error('check-bundle FAILED: BUNDLE_BUDGET is not a number: ' + raw);
   process.exit(1);
