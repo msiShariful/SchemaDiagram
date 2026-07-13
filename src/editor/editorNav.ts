@@ -3,6 +3,7 @@ import type { Text } from '@codemirror/state';
 import { buildTableRanges, rangeForTable } from './sourceMap';
 import { formatDbmlSource } from '../core/format/formatDbml';
 import { useAppStore } from '../app/store';
+import { rewriteTableHeader, type TableHeaderEdit } from './tableSettings';
 
 let currentView: EditorView | null = null;
 
@@ -57,5 +58,28 @@ export function applyFormat(): boolean {
   if (formatted !== current) {
     view.dispatch({ changes: { from: 0, to: current.length, insert: formatted } });
   }
+  return true;
+}
+
+/** Canvas→text bridge (Feature B) — the sanctioned way for canvas-origin UI
+ *  to change DBML, alongside applyFormat/revealTable: ONE CodeMirror
+ *  transaction, so undo lives in editor history and the parse pipeline
+ *  re-renders the result. Never touches store schema state.
+ *  Renaming deliberately does NOT rewrite refs: dangling refs surface as
+ *  ordinary parse errors (stale badge + problems panel), exactly as if the
+ *  user had typed the rename. */
+export function applyTableSettings(tableId: string, edit: TableHeaderEdit): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const doc = view.state.doc.toString();
+  const range = rangeForTable(buildTableRanges(doc), tableId);
+  if (!range) return false;
+  const header = doc.slice(range.headerFrom, range.headerTo);
+  const rewritten = rewriteTableHeader(header, edit);
+  if (rewritten === null) return false; // unsafe shape — refuse, make no edit
+  if (rewritten === header.trimEnd()) return true; // no-op: nothing to dispatch
+  view.dispatch({
+    changes: { from: range.headerFrom, to: range.headerTo, insert: `${rewritten} ` },
+  });
   return true;
 }

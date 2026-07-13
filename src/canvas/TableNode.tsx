@@ -14,11 +14,13 @@ interface Props {
   focused: boolean;
   selected: boolean;
   onOpenInEditor: (id: string) => void;
+  onOpenSettings: (id: string) => void; // stable callback (memo contract) — gear passes the id out
   registerEl: (id: string, el: SVGGElement | null) => void;
 }
 
 export const TableNode = memo(function TableNode({
-  table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected, onOpenInEditor, registerEl,
+  table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected,
+  onOpenInEditor, onOpenSettings, registerEl,
 }: Props) {
   const gRef = useRef<SVGGElement | null>(null);
   const drag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -84,6 +86,25 @@ export const TableNode = memo(function TableNode({
                 </text>
               </g>
             ))}
+          {/* Gear (Feature B): visible on table hover via CSS. Inline
+              closures here are fine — they live INSIDE the memoized
+              component; the PROP (onOpenSettings) is what must be stable.
+              stopPropagation on pointerdown keeps a gear press from
+              starting a drag. */}
+          <g
+            className="table-gear"
+            transform={`translate(${TABLE_WIDTH - 24}, ${HEADER_HEIGHT / 2 - 8})`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSettings(table.id);
+            }}
+          >
+            <rect width={16} height={16} rx={3} className="table-gear-bg" />
+            <text x={8} y={8} textAnchor="middle" dominantBaseline="central" className="table-gear-glyph">
+              {'⚙︎'}
+            </text>
+          </g>
         </>
       )}
     </g>

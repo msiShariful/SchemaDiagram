@@ -4,6 +4,7 @@ import { EdgeLayer, type EdgeLayerHandle } from './EdgeLayer';
 import { GroupLayer } from './GroupLayer';
 import { MiniMap, type MiniMapHandle } from './MiniMap';
 import { TableNode } from './TableNode';
+import { TableSettingsPopover } from './TableSettingsPopover';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -76,6 +77,7 @@ export function DiagramCanvas() {
   const spaceDown = useRef(false);
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
   const [layoutBusy, setLayoutBusy] = useState(false);
+  const [settingsTableId, setSettingsTableId] = useState<string | null>(null);
 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
@@ -111,6 +113,11 @@ export function DiagramCanvas() {
     if (el) nodeEls.current.set(id, el);
     else nodeEls.current.delete(id);
   }, []);
+
+  // Stable callbacks (TableNode memo contract): the gear passes the id out;
+  // the popover itself lives in the HTML layer below, outside the SVG.
+  const handleOpenSettings = useCallback((id: string) => setSettingsTableId(id), []);
+  const closeSettings = useCallback(() => setSettingsTableId(null), []);
 
   // Guide lines are two persistent <line> elements toggled/positioned via
   // direct setAttribute — never React state (perf contract).
@@ -515,6 +522,7 @@ export function DiagramCanvas() {
                 focused={t.id === editorFocusTableId}
                 selected={selectedSet.has(t.id)}
                 onOpenInEditor={revealTable}
+                onOpenSettings={handleOpenSettings}
                 registerEl={registerNodeEl}
               />
             );
@@ -546,6 +554,7 @@ export function DiagramCanvas() {
         <button onClick={fit}>fit</button>
         <span>{zoomPct}%</span>
       </div>
+      {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
     </div>
   );
 }
