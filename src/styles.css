@@ -108,16 +108,6 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .diagram-manager button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer; }
 .diagram-manager .name-button { font-weight: 600; }
 .diagram-manager .name-input { font-size: 12px; padding: 3px 6px; }
-.diagram-list {
-  position: absolute; top: 30px; left: 0; z-index: 20; min-width: 340px;
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12); list-style: none; margin: 0; padding: 4px;
-}
-.diagram-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; }
-.diagram-list li.current { background: var(--selection-bg); }
-.diagram-list .open-button { flex: 1; text-align: left; border: none; background: none; font-weight: 500; color: var(--text); }
-.diagram-list .when { font-size: 10px; color: var(--text-dim); }
-.diagram-list .danger { color: var(--error); }
 .banner-warning { background: var(--banner-bg); color: var(--banner-text); padding: 6px 12px; font-size: 13px; }
 .canvas-wrap { position: absolute; inset: 0; }
 .zoom-controls {
@@ -253,3 +243,51 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer;
 }
 .ts-error { color: var(--error); }
+
+/* Plan 6 Feature C: project dashboard */
+.dash-backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 40; }
+.dashboard {
+  position: fixed; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: min(960px, 94vw); z-index: 41; display: flex; background: var(--bg);
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  box-shadow: 0 0 48px rgba(0, 0, 0, 0.3); color: var(--text);
+}
+.dash-rail {
+  width: 190px; border-right: 1px solid var(--border); background: var(--bg-panel);
+  padding: 16px; display: flex; flex-direction: column; gap: 14px;
+}
+.dash-new {
+  font-size: 13px; padding: 8px 10px; border: 1px solid var(--accent);
+  background: var(--accent); color: #fff; border-radius: 6px; cursor: pointer;
+}
+.dash-rail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+.dash-main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow-y: auto; min-width: 0; }
+.dash-topbar { display: flex; gap: 8px; }
+.dash-search {
+  flex: 1; font-size: 13px; padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg); color: var(--text);
+}
+.dash-close { border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.dash-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dash-table th {
+  text-align: left; color: var(--text-dim); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 1px solid var(--border);
+}
+.dash-row td { padding: 9px 8px; border-bottom: 1px solid var(--border); }
+.dash-row { cursor: pointer; }
+.dash-row:hover { background: var(--selection-bg); }
+.dash-row.current .dash-name { font-weight: 600; }
+.dash-name input { font-size: 13px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); }
+.dash-modified, .dash-created { color: var(--text-dim); white-space: nowrap; }
+.dash-actions { position: relative; width: 100px; text-align: right; white-space: nowrap; }
+.dash-actions button { font-size: 12px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+.dash-kebab { border: none !important; background: none !important; font-size: 15px; color: var(--text-dim) !important; }
+.dash-menu {
+  position: absolute; right: 4px; top: 26px; z-index: 5; min-width: 140px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); padding: 4px; display: flex; flex-direction: column;
+}
+.dash-menu button { text-align: left; border: none; background: none; padding: 7px 10px; border-radius: 4px; font-size: 12px; }
+.dash-menu button:hover { background: var(--selection-bg); }
+.dash-menu .danger, .dash-actions .danger { color: var(--error); }
+.dash-empty { color: var(--text-dim); padding: 16px 8px; }

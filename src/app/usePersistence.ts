@@ -155,22 +155,6 @@ export async function createDiagram(): Promise<void> {
   useAppStore.getState().loadDiagram(rec);
 }
 
-export async function duplicateDiagram(): Promise<void> {
-  // Flush the original first: a pending debounced autosave is otherwise
-  // re-scheduled after loadDiagram(copy) and would read the COPY's state,
-  // leaving the original's record stale (typed edits lost on switch-back).
-  await saveCurrent();
-  invalidatePendingAutosave();
-  const cur = currentRecord();
-  if (!cur) return;
-  const copy: DiagramRecord = {
-    ...cur, id: nanoid(), name: `${cur.name} copy`,
-    createdAt: Date.now(), updatedAt: Date.now(), // a copy is a NEW document
-  };
-  try { await putDiagram(copy); } catch { useAppStore.getState().setStorageUnavailable(true); }
-  useAppStore.getState().loadDiagram(copy);
-}
-
 export async function removeDiagram(id: string): Promise<void> {
   if (useAppStore.getState().diagramId === id) {
     // Deleting the CURRENT diagram: must run first, synchronously (before

@@ -44,7 +44,8 @@ test('SQL import per dialect creates a NEW diagram each time, never overwriting 
 
   // starter + one NEW diagram per dialect — nothing was overwritten
   await page.getByRole('button', { name: /diagrams/ }).click();
-  await expect(page.locator('.diagram-list li')).toHaveCount(1 + DIALECTS.length);
+  // Feature C: the diagrams trigger now opens the dashboard overlay.
+  await expect(page.locator('.dash-row')).toHaveCount(1 + DIALECTS.length);
 });
 
 test('every export format downloads (spec §10: "export each format")', async ({ page }) => {
