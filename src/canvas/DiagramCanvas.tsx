@@ -21,6 +21,7 @@ import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 import { DiagramViewsSidebar } from './DiagramViewsSidebar';
 import { registerCanvasHandle } from './canvasNav';
 import { visibleTableRects } from '../core/model/visibility';
+import { overlayDepth } from '../app/overlayStack';
 
 // Gesture ledger rules — shared by every per-schema-object drag on the canvas
 // (table, note, group; the minimap's viewport drag doesn't carry a
@@ -294,6 +295,10 @@ export function DiagramCanvas() {
       const target = e.target as HTMLElement | null;
       if (target && (target.closest('.cm-editor') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
       if (e.key === 'Escape') {
+        // Last resort: overlays own Escape while any is open (overlayStack),
+        // and a busy ImportDialog is modal-but-off-stack (its busy gate) —
+        // the .dialog check keeps this from acting behind it.
+        if (overlayDepth() > 0 || document.querySelector('.dialog')) return;
         useAppStore.getState().setSelectedTables([]);
         return;
       }

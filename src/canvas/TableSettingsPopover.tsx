@@ -3,6 +3,7 @@ import { useAppStore } from '../app/store';
 import { applyTableSettings } from '../editor/editorNav';
 import { HEX_COLOR_RE } from '../editor/tableSettings';
 import { TABLE_WIDTH } from '../core/model/geometry';
+import { useOverlayEscape } from '../app/overlayStack';
 
 export const HEADER_SWATCHES: readonly string[] = [
   '#2196f3', '#f44336', '#4caf50', '#ff9800', '#9c27b0', '#009688',
@@ -36,17 +37,14 @@ export function TableSettingsPopover({ tableId, onClose }: Props) {
     if (!table || !pos) onClose();
   }, [table, pos, onClose]);
 
+  useOverlayEscape(true, onClose);
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
     const onDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) onClose();
     };
-    window.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onDown);
     return () => {
-      window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onDown);
     };
   }, [onClose]);

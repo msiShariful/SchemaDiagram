@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useOverlayEscape } from './overlayStack';
 
 export const HOVER_OPEN_DELAY_MS = 100; // hover-intent: don't open on a drive-by
 export const HOVER_CLOSE_GRACE_MS = 250; // diagonal travel trigger→menu crosses a small gap
@@ -48,20 +49,17 @@ export function useHoverMenu(): HoverMenu {
     });
   }, []);
 
+  useOverlayEscape(open, close);
+
   useEffect(() => clear, []); // unmount: no timer leaks
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
     const onDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) close();
     };
-    window.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onDown);
     return () => {
-      window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onDown);
     };
   }, [open, close]);

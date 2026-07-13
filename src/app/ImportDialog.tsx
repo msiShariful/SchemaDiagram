@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { importSql, type SqlDialect } from '../core/convert/convert';
 import { parseProject } from '../core/convert/projectFile';
 import { importDiagram } from './usePersistence';
 import type { ParseError } from '../core/parse/parseDbml';
+import { useOverlayEscape } from './overlayStack';
 
 type ImportKind = SqlDialect | 'dbml' | 'project';
 
@@ -22,13 +23,11 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   const [errors, setErrors] = useState<ParseError[]>([]);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    // Gate on !busy: closing while an import is in flight lets it land
-    // after the dialog (and its error surface) is already gone.
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, busy]);
+  // Busy gate preserved: while an import is in flight the dialog is not on
+  // the stack, so Escape must not close it. The canvas last-resort checks
+  // for a mounted .dialog (see the DiagramCanvas edit below) so this Escape
+  // doesn't fall through and clear the selection behind the modal.
+  useOverlayEscape(!busy, onClose);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;

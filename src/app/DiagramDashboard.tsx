@@ -6,6 +6,7 @@ import {
   switchDiagram, createDiagram, removeDiagram, renameDiagramById, duplicateDiagramById,
 } from './usePersistence';
 import { formatDiagramDate } from './relativeDate';
+import { useOverlayEscape } from './overlayStack';
 
 interface Props {
   onClose: () => void;
@@ -29,13 +30,19 @@ export function DiagramDashboard({ onClose }: Props) {
     refresh();
   }, [refresh, diagramId]);
 
+  useOverlayEscape(true, onClose); // the dashboard exists only while open
+
+  // P6 deferred item: the row kebab had no outside-click dismissal. Class-
+  // based containment check — rows are mapped, a per-row ref would be noise.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    if (menuId === null) return;
+    const onDown = (e: PointerEvent) => {
+      const el = e.target as Element | null;
+      if (!el?.closest?.('.dash-menu') && !el?.closest?.('.dash-kebab')) setMenuId(null);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [menuId]);
 
   const commitRename = (id: string, value: string) => {
     setRenamingId(null);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
 import type { LodOverride } from './lod';
+import { useOverlayEscape } from '../app/overlayStack';
 
 // The app's REAL shortcuts (see DiagramCanvas keyboard effect + the editor
 // keymap) — a static list, updated by hand when a shortcut changes.
@@ -24,18 +25,15 @@ export function CanvasControls() {
   const setLodOverride = useAppStore((s) => s.setLodOverride);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
+  useOverlayEscape(shortcutsOpen, () => setShortcutsOpen(false));
+
   useEffect(() => {
     if (!shortcutsOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShortcutsOpen(false);
-    };
     const onDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setShortcutsOpen(false);
     };
-    window.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onDown);
     return () => {
-      window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onDown);
     };
   }, [shortcutsOpen]);
