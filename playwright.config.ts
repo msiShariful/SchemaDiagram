@@ -25,6 +25,9 @@ export default defineConfig({
     command: 'npm run dev -- --strictPort',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    // Ceiling, not a wait: zero cost on a healthy machine. Cold-start Vite
+    // dep pre-bundling (@dbml/core is huge) on a fresh CI runner is the one
+    // startup-shaped failure mode a retry re-suffers most expensively.
+    timeout: 120_000,
   },
 });
