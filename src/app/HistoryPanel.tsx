@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useHoverMenu } from './useHoverMenu';
 import { useAppStore } from './store';
 import { listSnapshots } from '../core/persist/repository';
 import type { DiagramSnapshot } from '../core/persist/repository';
@@ -6,7 +7,7 @@ import { restoreSnapshot } from './usePersistence';
 
 export function HistoryPanel() {
   const diagramId = useAppStore((s) => s.diagramId);
-  const [open, setOpen] = useState(false);
+  const menu = useHoverMenu();
   const [snaps, setSnaps] = useState<DiagramSnapshot[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -22,15 +23,8 @@ export function HistoryPanel() {
   };
 
   useEffect(() => {
-    if (open && diagramId) refresh(diagramId);
-  }, [open, diagramId]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+    if (menu.open && diagramId) refresh(diagramId);
+  }, [menu.open, diagramId]);
 
   const restore = (snap: DiagramSnapshot) => {
     // restoreSnapshot keeps the diagram id, so refreshing with the captured
@@ -42,9 +36,9 @@ export function HistoryPanel() {
   };
 
   return (
-    <div className="history-wrap">
-      <button onClick={() => setOpen((v) => !v)}>{open ? '▲' : '▼'} history</button>
-      {open && (
+    <div className="history-wrap" ref={menu.rootRef} {...menu.rootProps}>
+      <button onClick={menu.toggle}>{menu.open ? '▲' : '▼'} history</button>
+      {menu.open && (
         <div className="history-panel">
           <div className="history-header">Snapshots — newest first, last 20 kept</div>
           {snaps.length === 0 ? (

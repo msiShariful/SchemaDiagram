@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { useAppStore } from './store';
+import { useHoverMenu } from './useHoverMenu';
 import { exportSql, type SqlDialect } from '../core/convert/convert';
 import { serializeProject } from '../core/convert/projectFile';
 import { downloadBlob, downloadText } from './export/download';
@@ -14,24 +14,17 @@ const SQL_DIALECTS: Array<{ dialect: SqlDialect; label: string }> = [
 ];
 
 export function ExportMenu() {
-  const [open, setOpen] = useState(false);
+  const menu = useHoverMenu();
   const stale = useAppStore((s) => s.stale);
   const errors = useAppStore((s) => s.errors);
   const tableCount = useAppStore((s) => s.schema.tables.length);
   const sqlDisabled = stale || errors.length > 0;
   const imageDisabled = tableCount === 0;
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
   const exportDbml = () => {
     const s = useAppStore.getState();
     downloadText(s.source, `${safeFilename(s.diagramName)}.dbml`);
-    setOpen(false);
+    menu.close();
   };
 
   const exportProject = () => {
@@ -44,7 +37,7 @@ export function ExportMenu() {
       `${safeFilename(s.diagramName)}.json`,
       'application/json',
     );
-    setOpen(false);
+    menu.close();
   };
 
   const exportAsSql = async (dialect: SqlDialect) => {
@@ -52,7 +45,7 @@ export function ExportMenu() {
     const r = await exportSql(s.source, dialect);
     if (r.ok) downloadText(r.text, `${safeFilename(s.diagramName)}.${dialect}.sql`);
     else window.alert(`SQL export failed: ${r.errors[0]?.message ?? 'unknown error'}`);
-    setOpen(false);
+    menu.close();
   };
 
   const exportSvgFile = () => {
@@ -61,7 +54,7 @@ export function ExportMenu() {
       const name = useAppStore.getState().diagramName;
       downloadBlob(new Blob([built.markup], { type: 'image/svg+xml' }), `${safeFilename(name)}.svg`);
     }
-    setOpen(false);
+    menu.close();
   };
 
   const exportPngFile = async () => {
@@ -77,15 +70,21 @@ export function ExportMenu() {
     } catch (e) {
       window.alert(`PNG export failed: ${e instanceof Error ? e.message : 'unknown error'}`);
     }
-    setOpen(false);
+    menu.close();
   };
 
   return (
-    <div className="export-menu">
-      <button onClick={() => setOpen((v) => !v)}>{open ? '▲' : '▼'} export</button>
-      {open && (
-        <ul className="export-list">
+    <div className="export-menu" ref={menu.rootRef} {...menu.rootProps}>
+      <button onClick={menu.toggle}>{menu.open ? '▲' : '▼'} export</button>
+      {menu.open && (
+        <ul className="menu-list">
+          <li className="menu-group">Document</li>
           <li><button onClick={exportDbml}>DBML (.dbml)</button></li>
+          <li><button onClick={exportProject}>Project file (.json)</button></li>
+          <li><button disabled={imageDisabled} onClick={() => void exportPngFile()}>PNG (2x)</button></li>
+          <li><button disabled={imageDisabled} onClick={exportSvgFile}>SVG (.svg)</button></li>
+          <li className="menu-sep" role="separator" />
+          <li className="menu-group">SQL</li>
           {SQL_DIALECTS.map(({ dialect, label }) => (
             <li key={dialect}>
               <button
@@ -97,9 +96,6 @@ export function ExportMenu() {
               </button>
             </li>
           ))}
-          <li><button disabled={imageDisabled} onClick={exportSvgFile}>SVG (.svg)</button></li>
-          <li><button disabled={imageDisabled} onClick={() => void exportPngFile()}>PNG (2x)</button></li>
-          <li><button onClick={exportProject}>Project file (.json)</button></li>
         </ul>
       )}
     </div>
