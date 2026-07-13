@@ -10,6 +10,7 @@ const SQL_DIALECTS: Array<{ dialect: SqlDialect; label: string }> = [
   { dialect: 'postgres', label: 'PostgreSQL' },
   { dialect: 'mysql', label: 'MySQL' },
   { dialect: 'mssql', label: 'SQL Server' },
+  { dialect: 'oracle', label: 'Oracle' },
 ];
 
 export function ExportMenu() {

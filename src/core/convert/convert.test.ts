@@ -16,7 +16,7 @@ Ref: posts.user_id > users.id
 `;
 
 describe('exportSql', () => {
-  it.each(['postgres', 'mysql', 'mssql'] as const)('emits CREATE TABLE DDL for %s', async (d) => {
+  it.each(['postgres', 'mysql', 'mssql', 'oracle'] as const)('emits CREATE TABLE DDL for %s', async (d) => {
     const r = await exportSql(DBML, d);
     if (!r.ok) throw new Error(r.errors[0]?.message);
     expect(r.text).toContain('CREATE TABLE');
@@ -68,5 +68,16 @@ describe('importSql', () => {
     if (r.ok) return;
     expect(r.errors[0].message).toMatch(/mismatched|extraneous|expecting/i);
     expect(r.errors[0].line).toBe(1);
+  });
+
+  it('converts oracle DDL to DBML that our dbmlv2 pipeline re-parses', async () => {
+    const sql = 'CREATE TABLE refunds (id NUMBER PRIMARY KEY, amount NUMBER(10,2) NOT NULL);';
+    const r = await importSql(sql, 'oracle');
+    if (!r.ok) throw new Error(r.errors[0]?.message);
+    const parsed = parseDbml(r.text);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.schema.tables[0].name).toBe('refunds');
+    expect(parsed.schema.tables[0].fields.map((f) => f.name)).toEqual(['id', 'amount']);
   });
 });

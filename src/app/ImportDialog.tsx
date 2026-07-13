@@ -10,6 +10,7 @@ const KIND_OPTIONS: Array<{ kind: ImportKind; label: string }> = [
   { kind: 'postgres', label: 'PostgreSQL DDL' },
   { kind: 'mysql', label: 'MySQL DDL' },
   { kind: 'mssql', label: 'SQL Server DDL' },
+  { kind: 'oracle', label: 'Oracle DDL' },
   { kind: 'dbml', label: 'DBML' },
   { kind: 'project', label: 'Project file (.json)' },
 ];

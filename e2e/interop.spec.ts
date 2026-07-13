@@ -18,6 +18,11 @@ const DIALECTS = [
     sql: 'CREATE TABLE payments (id INT PRIMARY KEY, amount DECIMAL(10,2) NOT NULL);',
     table: 'payments',
   },
+  {
+    kind: 'oracle',
+    sql: 'CREATE TABLE refunds (id NUMBER PRIMARY KEY, amount NUMBER(10,2) NOT NULL);',
+    table: 'refunds',
+  },
 ] as const;
 
 test('SQL import per dialect creates a NEW diagram each time, never overwriting (spec §10)', async ({ page }) => {
@@ -63,6 +68,7 @@ test('every export format downloads (spec §10: "export each format")', async ({
     { dialect: 'postgres', label: 'SQL — PostgreSQL' },
     { dialect: 'mysql', label: 'SQL — MySQL' },
     { dialect: 'mssql', label: 'SQL — SQL Server' },
+    { dialect: 'oracle', label: 'SQL — Oracle' },
   ] as const) {
     const sql = await exportItem(label); // the first one pays the lazy @dbml/core chunk load
     expect(sql.suggestedFilename()).toBe(`Untitled.${dialect}.sql`);

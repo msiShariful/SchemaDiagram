@@ -1,7 +1,7 @@
 import type { ParseError } from '../parse/errors';
 import { normalizeParseErrors } from '../parse/errors';
 
-export type SqlDialect = 'postgres' | 'mysql' | 'mssql';
+export type SqlDialect = 'postgres' | 'mysql' | 'mssql' | 'oracle';
 export type ConvertResult = { ok: true; text: string } | { ok: false; errors: ParseError[] };
 
 // @dbml/core is ~2.7 MB gzipped — it must never land in the main chunk
@@ -13,8 +13,8 @@ const loadCore = () => import('@dbml/core');
 
 /** SQL DDL → DBML text. Uses the installed 8.3.1 facade
  *  `importer.import(str, format)`, which parses with the v2 dialect parsers
- *  ('postgres' | 'mysql' | 'mssql') and re-emits DBML via its own exporter —
- *  so the result is always re-parseable by our 'dbmlv2' pipeline. */
+ *  ('postgres' | 'mysql' | 'mssql' | 'oracle') and re-emits DBML via its own
+ *  exporter — so the result is always re-parseable by our 'dbmlv2' pipeline. */
 export async function importSql(sql: string, dialect: SqlDialect): Promise<ConvertResult> {
   try {
     const { importer } = await loadCore();
