@@ -19,17 +19,17 @@ interface Props {
 export const MiniMap = memo(forwardRef<MiniMapHandle, Props>(function MiniMap({ viewSize, onNavigate }, ref) {
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
+  const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
   const viewRectEl = useRef<SVGRectElement>(null);
   const dragging = useRef(false);
   const lastScrub = useRef<Point | null>(null); // last world center navTo computed (see pointercancel)
 
-  const items = useMemo(
-    () =>
-      schema.tables
-        .filter((t) => positions[t.id])
-        .map((t) => ({ id: t.id, rect: getTableRect(t, positions[t.id]), color: t.headerColor })),
-    [schema, positions],
-  );
+  const items = useMemo(() => {
+    const hidden = new Set(hiddenTableIds);
+    return schema.tables
+      .filter((t) => positions[t.id] && !hidden.has(t.id))
+      .map((t) => ({ id: t.id, rect: getTableRect(t, positions[t.id]), color: t.headerColor }));
+  }, [schema, positions, hiddenTableIds]);
   const bounds = useMemo(() => boundsOfRects(items.map((i) => i.rect)), [items]);
   const t: MiniTransform | null = bounds ? minimapTransform(bounds) : null;
 

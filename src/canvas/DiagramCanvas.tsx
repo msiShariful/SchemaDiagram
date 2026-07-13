@@ -17,6 +17,9 @@ import { revealTable } from '../editor/editorNav';
 import { runElkLayout } from '../core/layout/elkLayout';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
+import { DiagramViewsSidebar } from './DiagramViewsSidebar';
+import { registerCanvasHandle } from './canvasNav';
+import { visibleTableRects } from '../core/model/visibility';
 
 // Gesture ledger rules — shared by every per-schema-object drag on the canvas
 // (table, note, group; the minimap's viewport drag doesn't carry a
@@ -86,6 +89,11 @@ export function DiagramCanvas() {
   const editorFocusTableId = useAppStore((s) => s.editorFocusTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
+  const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
+  // Committed-state filter (perf contract): consulted only inside render
+  // maps; the imperative pan/drag paths never see it because hidden
+  // tables/edges are simply not mounted.
+  const hiddenSet = useMemo(() => new Set(hiddenTableIds), [hiddenTableIds]);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -161,9 +169,10 @@ export function DiagramCanvas() {
         members,
         base,
         live: { ...base },
-        otherRects: s.schema.tables
-          .filter((t) => s.positions[t.id] && !memberSet.has(t.id))
-          .map((t) => getTableRect(t, s.positions[t.id])),
+        // Snap candidates exclude hidden tables — no ghost alignment guides.
+        otherRects: visibleTableRects(s.schema, s.positions, s.hiddenTableIds)
+          .filter((x) => !memberSet.has(x.id))
+          .map((x) => x.rect),
         size: { w: TABLE_WIDTH, h: tableHeight(table?.fields.length ?? 0) },
         moved: false,
       };
@@ -311,6 +320,37 @@ export function DiagramCanvas() {
     };
   }, []);
 
+  // canvasNav registered handle (same pattern as editorNav): the Views
+  // sidebar centers tables through it. Committed-viewport write → the
+  // layout-effect subscription applies the transform before paint.
+  useEffect(() => {
+    registerCanvasHandle({
+      centerOnTable(id) {
+        const s = useAppStore.getState();
+        const table = s.schema.tables.find((t) => t.id === id);
+        const pos = s.positions[id];
+        const svg = svgRef.current;
+        if (!table || !pos || !svg) return;
+        const rect = getTableRect(table, pos);
+        const view = svg.getBoundingClientRect();
+        const zoom = vpRef.current.zoom; // keep the user's zoom, just recenter
+        s.setViewport({
+          zoom,
+          x: view.width / 2 - (rect.x + rect.w / 2) * zoom,
+          y: view.height / 2 - (rect.y + rect.h / 2) * zoom,
+        });
+        // Flash the focus outline via the same store field the editor-cursor
+        // highlight uses — no new highlight machinery.
+        s.setEditorFocusTable(id);
+        setTimeout(() => {
+          const st = useAppStore.getState();
+          if (st.editorFocusTableId === id) st.setEditorFocusTable(null);
+        }, 1500);
+      },
+    });
+    return () => registerCanvasHandle(null);
+  }, []);
+
   const applyTransform = () => {
     const { x, y, zoom } = vpRef.current;
     zoomRef.current = zoom;
@@ -432,9 +472,7 @@ export function DiagramCanvas() {
       store.setSelectedTables([]);
       return;
     }
-    const items = store.schema.tables
-      .filter((t) => store.positions[t.id])
-      .map((t) => ({ id: t.id, rect: getTableRect(t, store.positions[t.id]) }));
+    const items = visibleTableRects(store.schema, store.positions, store.hiddenTableIds); // can't select hidden
     store.setSelectedTables(idsInRect(items, sel));
   };
 
@@ -457,18 +495,18 @@ export function DiagramCanvas() {
     useAppStore.getState().setViewport(vpRef.current);
   };
   const fit = () => {
-    const { schema, positions } = useAppStore.getState();
-    const rects = schema.tables.filter((t) => positions[t.id]).map((t) => getTableRect(t, positions[t.id]));
+    const { schema, positions, hiddenTableIds: hid } = useAppStore.getState();
+    const rects = visibleTableRects(schema, positions, hid).map((x) => x.rect);
     const rect = svgRef.current!.getBoundingClientRect();
     useAppStore.getState().setViewport(fitViewport(rects, rect.width, rect.height));
   };
 
   const autoLayout = async () => {
-    const { schema } = useAppStore.getState();
+    const { schema, hiddenTableIds: hid } = useAppStore.getState();
     if (schema.tables.length === 0 || layoutBusy) return;
     setLayoutBusy(true);
     try {
-      const next = await runElkLayout(schema);
+      const next = await runElkLayout(schema, hid); // visible only; hidden keep their positions
       const st = useAppStore.getState();
       if (st.schema !== schema) return; // schema changed mid-layout: stale result, discard
       const tables = Object.keys(next).map((id) => ({
@@ -501,6 +539,7 @@ export function DiagramCanvas() {
           <GroupLayer zoomRef={zoomRef} onLiveMoveSet={handleGroupLiveMove} onCommitMoveSet={handleGroupCommit} />
           <EdgeLayer ref={edgeLayerRef} viewRect={viewRect} />
           {schema.tables.map((t) => {
+            if (hiddenSet.has(t.id)) return null; // Feature D: hidden = not mounted
             const pos = positions[t.id];
             if (!pos) return null;
             // The actively-dragged table's <g> holds pointer capture for the
@@ -554,6 +593,7 @@ export function DiagramCanvas() {
         <button onClick={fit}>fit</button>
         <span>{zoomPct}%</span>
       </div>
+      <DiagramViewsSidebar />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
     </div>
   );

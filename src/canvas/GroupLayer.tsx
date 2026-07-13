@@ -1,6 +1,7 @@
-import { memo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useAppStore } from '../app/store';
 import { computeGroupRect, GROUP_HEADER_HEIGHT } from '../core/layout/groups';
+import { omitHidden } from '../core/model/visibility';
 import type { TablePosition } from '../core/model/types';
 
 interface Props {
@@ -22,6 +23,13 @@ interface GroupDrag {
 export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onCommitMoveSet }: Props) {
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
+  const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
+  // Group rects hug VISIBLE members only; all-hidden → computeGroupRect null
+  // → the group disappears. Group-header drags still move ALL members'
+  // stored positions (startDrag reads unfiltered store positions) —
+  // deliberate: group integrity survives hide/unhide. This is the intentional
+  // exception to hiding-deselects: membership, not selection, drives it.
+  const visPositions = useMemo(() => omitHidden(positions, hiddenTableIds), [positions, hiddenTableIds]);
   const drag = useRef<GroupDrag | null>(null);
 
   const startDrag = (memberIds: string[]) => (e: React.PointerEvent<SVGGElement>) => {
@@ -69,7 +77,7 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
   return (
     <g className="group-layer">
       {schema.groups.map((g) => {
-        const rect = computeGroupRect(g, schema, positions);
+        const rect = computeGroupRect(g, schema, visPositions);
         if (!rect) return null;
         const color = g.color ?? 'var(--table-header)';
         return (

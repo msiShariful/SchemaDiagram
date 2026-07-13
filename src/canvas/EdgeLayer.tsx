@@ -43,9 +43,18 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
   const hoveredTableId = useAppStore((s) => s.hoveredTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
+  const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
   const pathRefs = useRef(new Map<string, SVGPathElement>());
 
-  const specs = useMemo(() => buildEdgeSpecs(schema), [schema]);
+  // Feature D: filtering HERE means render, specsByTable, and the imperative
+  // updateTablePositions path all inherit it — an edge with a hidden endpoint
+  // simply doesn't exist, and no per-tick code changes.
+  const specs = useMemo(() => {
+    const hidden = new Set(hiddenTableIds);
+    return buildEdgeSpecs(schema).filter(
+      (sp) => !hidden.has(sp.fromTableId) && !hidden.has(sp.toTableId),
+    );
+  }, [schema, hiddenTableIds]);
   const tablesById = useMemo(() => new Map(schema.tables.map((t) => [t.id, t])), [schema]);
   const specsByTable = useMemo(() => {
     const m = new Map<string, EdgeSpec[]>();

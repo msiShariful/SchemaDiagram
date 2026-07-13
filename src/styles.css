@@ -291,3 +291,43 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .dash-menu button:hover { background: var(--selection-bg); }
 .dash-menu .danger, .dash-actions .danger { color: var(--error); }
 .dash-empty { color: var(--text-dim); padding: 16px 8px; }
+
+/* Plan 6 Feature D: Diagram Views sidebar */
+.views-tab {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 15;
+  border: 1px solid var(--border); border-right: none; background: var(--bg-elev); color: var(--text);
+  border-radius: 6px 0 0 6px; padding: 14px 4px; cursor: pointer; font-size: 13px;
+}
+.views-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 260px; z-index: 15;
+  background: var(--bg-elev); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; font-size: 12px; color: var(--text);
+}
+.views-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.views-collapse { border: none; background: none; color: var(--text-dim); cursor: pointer; font-size: 14px; }
+.views-search {
+  margin: 10px 12px 0; padding: 6px 8px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);
+}
+.views-groupby { color: var(--text-dim); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.views-tree { flex: 1; overflow-y: auto; padding: 4px 0; }
+.views-schema {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-weight: 600;
+}
+.views-schema-name { flex: 1; }
+.views-count { color: var(--text-dim); font-weight: 400; }
+.views-table-row { display: flex; align-items: center; gap: 8px; padding: 3px 12px 3px 22px; }
+.views-table-row:hover { background: var(--selection-bg); }
+.views-name {
+  flex: 1; text-align: left; border: none; background: none; color: var(--text);
+  cursor: pointer; padding: 3px 0; font-size: 12px;
+}
+.views-eye { border: none; background: none; color: var(--text); cursor: pointer; padding: 2px; display: flex; }
+.views-footer { border-top: 1px solid var(--border); padding: 8px 12px; }
+.views-all {
+  width: 100%; font-size: 12px; padding: 5px 0; border: 1px solid var(--border);
+  background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer;
+}
