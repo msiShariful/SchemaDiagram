@@ -4,6 +4,7 @@ import type { Schema, TablePosition, Viewport } from '../core/model/types';
 import { EMPTY_SCHEMA } from '../core/model/types';
 import type { ParseError, ParseResult } from '../core/parse/parseDbml';
 import type { PersistedDiagram } from '../core/persist/repository';
+import type { LodOverride } from '../canvas/lod';
 import { reconcilePositions } from '../core/model/reconcile';
 import { placeNewTables, placeNewNotes } from '../core/layout/placement';
 import { getTableRect } from '../core/model/geometry';
@@ -77,6 +78,10 @@ interface AppState {
   parsedSource: string | null;
   notePositions: Record<string, TablePosition>;
   selectedTableIds: string[];
+  hiddenTableIds: string[]; // view state: tables hidden from the canvas (Feature D) — layout-side, never DBML
+  diagramCreatedAt: number | null; // mirrors PersistedDiagram.createdAt so autosave round-trips it
+  snapEnabled: boolean; // session-only (not persisted): drag snap on/off (Feature E)
+  lodOverride: LodOverride; // session-only (not persisted): detail dropdown (Feature E)
   setSource(source: string): void;
   applyParse(result: ParseResult, source: string): void;
   setViewport(v: Viewport): void;
@@ -85,6 +90,9 @@ interface AppState {
   setDiagramName(name: string): void;
   setStorageUnavailable(v: boolean): void;
   setSelectedTables(ids: string[]): void;
+  setHiddenTables(ids: string[]): void;
+  setSnapEnabled(v: boolean): void;
+  setLodOverride(v: LodOverride): void;
   loadDiagram(rec: DiagramRecord): void;
   commitCanvasCommand(cmd: CanvasCommand): void;
   undoCanvas(): void;
@@ -107,6 +115,10 @@ export const useAppStore = create<AppState>()(
     parsedSource: null,
     notePositions: {},
     selectedTableIds: [],
+    hiddenTableIds: [],
+    diagramCreatedAt: null,
+    snapEnabled: true,
+    lodOverride: 'auto',
 
     setSource: (source) => set({ source }),
 
@@ -115,7 +127,7 @@ export const useAppStore = create<AppState>()(
         set({ errors: result.errors, stale: true });
         return;
       }
-      const { schema: prev, positions, notePositions, selectedTableIds } = get();
+      const { schema: prev, positions, notePositions, selectedTableIds, hiddenTableIds } = get();
       const kept = reconcilePositions(prev, result.schema, positions);
       const placed = placeNewTables(result.schema, kept);
       const nextPositions = { ...kept, ...placed };
@@ -133,6 +145,7 @@ export const useAppStore = create<AppState>()(
         positions: nextPositions,
         notePositions: { ...keptNotes, ...placedNotes },
         selectedTableIds: selectedTableIds.filter((id) => tableIds.has(id)),
+        hiddenTableIds: hiddenTableIds.filter((id) => tableIds.has(id)),
         errors: [],
         stale: false,
         parsedSource: source,
@@ -170,6 +183,19 @@ export const useAppStore = create<AppState>()(
     setDiagramName: (diagramName) => set({ diagramName }),
     setStorageUnavailable: (storageUnavailable) => set({ storageUnavailable }),
     setSelectedTables: (selectedTableIds) => set({ selectedTableIds }),
+    setHiddenTables: (hiddenTableIds) =>
+      set((s) => {
+        // Hiding deselects: a hidden table left in the selection would be
+        // silently moved by the next multi-select drag it isn't visible in.
+        // (Group drags are the intentional exception — membership, not selection.)
+        const hidden = new Set(hiddenTableIds);
+        return {
+          hiddenTableIds,
+          selectedTableIds: s.selectedTableIds.filter((id) => !hidden.has(id)),
+        };
+      }),
+    setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
+    setLodOverride: (lodOverride) => set({ lodOverride }),
 
     loadDiagram: (rec) => {
       resetCanvasStack();
@@ -187,6 +213,9 @@ export const useAppStore = create<AppState>()(
         hoveredTableId: null,
         editorFocusTableId: null,
         selectedTableIds: [],
+        hiddenTableIds: rec.hiddenTableIds ?? [], // pre-Plan-6 records: nothing hidden
+        diagramCreatedAt: rec.createdAt ?? null,
+        // snapEnabled / lodOverride deliberately untouched: session state.
       });
     },
   })),

@@ -10,6 +10,7 @@ const reset = () => {
     errors: [], stale: false, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null, storageUnavailable: false, editorFocusTableId: null,
     parsedSource: null, notePositions: {}, selectedTableIds: [],
+    hiddenTableIds: [], diagramCreatedAt: null, snapEnabled: true, lodOverride: 'auto',
   });
 };
 
@@ -323,5 +324,70 @@ describe('sticky note positions', () => {
       positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
     });
     expect(useAppStore.getState().notePositions).toEqual({});
+  });
+});
+
+describe('view state (Plan 6): hiddenTableIds, session flags, createdAt', () => {
+  beforeEach(reset);
+
+  it('defaults: nothing hidden, snap on, LOD auto, no createdAt', () => {
+    const s = useAppStore.getState();
+    expect(s.hiddenTableIds).toEqual([]);
+    expect(s.snapEnabled).toBe(true);
+    expect(s.lodOverride).toBe('auto');
+    expect(s.diagramCreatedAt).toBeNull();
+  });
+
+  it('applyParse prunes hidden ids of deleted tables, keeps live ones', () => {
+    const src = 'Table a { id int }\nTable b { id int }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setHiddenTables(['public.a', 'public.b']);
+    const next = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(next), next);
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.a']);
+  });
+
+  it('a failed parse leaves hiddenTableIds untouched (last-good-parse contract)', () => {
+    const src = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setHiddenTables(['public.a']);
+    useAppStore.getState().applyParse(parseDbml('Table a {'), 'Table a {');
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.a']);
+  });
+
+  it('setHiddenTables deselects the newly hidden tables (hiding deselects)', () => {
+    const src = 'Table a { id int }\nTable b { id int }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setSelectedTables(['public.a', 'public.b']);
+    useAppStore.getState().setHiddenTables(['public.a']);
+    expect(useAppStore.getState().selectedTableIds).toEqual(['public.b']);
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.a']);
+  });
+
+  it('loadDiagram loads hiddenTableIds/createdAt, defaulting for pre-Plan-6 records', () => {
+    useAppStore.getState().loadDiagram({
+      id: 'x', name: 'X', dbml: '', positions: {},
+      viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+      hiddenTableIds: ['public.t'], createdAt: 123,
+    });
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.t']);
+    expect(useAppStore.getState().diagramCreatedAt).toBe(123);
+
+    useAppStore.getState().loadDiagram({
+      id: 'y', name: 'Y', dbml: '', positions: {},
+      viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1, // pre-Plan-6 record: neither field
+    });
+    expect(useAppStore.getState().hiddenTableIds).toEqual([]);
+    expect(useAppStore.getState().diagramCreatedAt).toBeNull();
+  });
+
+  it('loadDiagram does NOT touch snapEnabled/lodOverride (session state)', () => {
+    useAppStore.getState().setSnapEnabled(false);
+    useAppStore.getState().setLodOverride('boxes');
+    useAppStore.getState().loadDiagram({
+      id: 'z', name: 'Z', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().snapEnabled).toBe(false);
+    expect(useAppStore.getState().lodOverride).toBe('boxes');
   });
 });

@@ -7,8 +7,10 @@ export interface PersistedDiagram {
   dbml: string;
   positions: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>; // optional: pre-Plan-3 records lack it
+  hiddenTableIds?: string[]; // optional: pre-Plan-6 records lack it (view state, Feature D)
   viewport: Viewport;
   updatedAt: number;
+  createdAt?: number; // optional: pre-Plan-6 records lack it ("—" in the dashboard)
 }
 
 /** One History entry. Ring buffer: at most SNAPSHOT_LIMIT rows per diagram. */
@@ -20,6 +22,7 @@ export interface DiagramSnapshot {
   dbml: string;
   positions: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>; // optional: pre-Plan-3 rows lack it
+  hiddenTableIds?: string[]; // optional: pre-Plan-6 rows lack it
   viewport: Viewport;
 }
 
