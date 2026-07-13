@@ -4,6 +4,8 @@ import { buildTableRanges, rangeForTable } from './sourceMap';
 import { formatDbmlSource } from '../core/format/formatDbml';
 import { useAppStore } from '../app/store';
 import { rewriteTableHeader, type TableHeaderEdit } from './tableSettings';
+import { findRefLine, MIRRORED, type RefOperator } from './refEdit';
+import type { Ref } from '../core/model/types';
 
 let currentView: EditorView | null = null;
 
@@ -80,6 +82,49 @@ export function applyTableSettings(tableId: string, edit: TableHeaderEdit): bool
   if (rewritten === header.trimEnd()) return true; // no-op: nothing to dispatch
   view.dispatch({
     changes: { from: range.headerFrom, to: range.headerTo, insert: `${rewritten} ` },
+    userEvent: 'canvas.settings',
   });
+  return true;
+}
+
+/** Feature A (canvas→text bridge, second consumer): append a standalone Ref
+ *  line at the end of the document. ONE transaction; editor history owns
+ *  undo; the parse pipeline renders the new edge ~300 ms later. */
+export function appendRefLine(line: string): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const len = view.state.doc.length;
+  const prefix = len === 0 || view.state.doc.sliceString(len - 1, len) === '\n' ? '' : '\n';
+  view.dispatch({
+    changes: { from: len, insert: `${prefix}${line}\n` },
+    userEvent: 'canvas.ref',
+  });
+  return true;
+}
+
+/** Rewrite a standalone ref's cardinality operator in place, preserving the
+ *  rest of the line (name, settings, spacing) byte-for-byte. False when the
+ *  line can't be located (inline/block-form ref) — the popover surfaces it. */
+export function applyRefOperator(ref: Ref, op: RefOperator): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const m = findRefLine(view.state.doc.toString(), ref);
+  if (!m) return false;
+  const written = m.flipped ? MIRRORED[op] : op;
+  if (written === m.operator) return true; // no-op: nothing to dispatch
+  view.dispatch({
+    changes: { from: m.opFrom, to: m.opTo, insert: written },
+    userEvent: 'canvas.ref',
+  });
+  return true;
+}
+
+/** Delete a standalone ref's whole line (incl. its trailing newline). */
+export function deleteRefLine(ref: Ref): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const m = findRefLine(view.state.doc.toString(), ref);
+  if (!m) return false;
+  view.dispatch({ changes: { from: m.lineFrom, to: m.lineTo }, userEvent: 'canvas.ref' });
   return true;
 }

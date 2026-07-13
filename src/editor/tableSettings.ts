@@ -79,8 +79,9 @@ function removeColor(bracket: string | undefined): string | undefined {
 }
 
 /** Bare identifier when possible, double-quoted otherwise; null when the
- *  name can't be represented on a header line at all. */
-function emitName(name: string): string | null {
+ *  name can't be represented on a single line at all. Shared by the header
+ *  rewriter and refEdit's line builder. */
+export function emitIdent(name: string): string | null {
   if (IDENT_RE.test(name)) return name;
   if (name === '' || name.includes('"') || name.includes('\n')) return null;
   return `"${name}"`;
@@ -93,7 +94,7 @@ export function rewriteTableHeader(header: string, edit: TableHeaderEdit): strin
 
   let name = nameTok;
   if (edit.name !== undefined) {
-    const emitted = emitName(edit.name.trim());
+    const emitted = emitIdent(edit.name.trim());
     if (emitted === null) return null;
     name = emitted;
   }
