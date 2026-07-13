@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeExportBounds } from './exportBounds';
 import type { Schema, Table, StickyNote } from '../../core/model/types';
+import { parseDbml } from '../../core/parse/parseDbml';
 
 const mkTable = (name: string): Table => ({
   id: `public.${name}`, schemaName: 'public', name, alias: null, headerColor: null, note: null,
@@ -48,5 +49,26 @@ describe('computeExportBounds', () => {
     // table-only union would capture.
     const b = computeExportBounds(s, { 'public.a': { x: 100, y: 100 } }, {});
     expect(b!.y).toBe(100 - 24 - 24);
+  });
+});
+
+describe('computeExportBounds — hidden tables (Plan 6)', () => {
+  it('excludes hidden tables (and their group contribution) from the bounds', () => {
+    const r = parseDbml('Table a { id int }\nTable b { id int }\nTableGroup g1 {\n  a\n  b\n}');
+    if (!r.ok) throw new Error('fixture parse failed');
+    const positions = { 'public.a': { x: 0, y: 0 }, 'public.b': { x: 1000, y: 0 } };
+    const full = computeExportBounds(r.schema, positions, {});
+    const without = computeExportBounds(r.schema, positions, {}, ['public.b']);
+    expect(full).not.toBeNull();
+    expect(without).not.toBeNull();
+    // b sits at x=1000: with it hidden, nothing (table OR group padding) may reach that far right
+    expect(without!.x + without!.w).toBeLessThan(1000);
+    expect(full!.x + full!.w).toBeGreaterThan(1000);
+  });
+
+  it('returns null when every table is hidden and nothing else is positioned', () => {
+    const r = parseDbml('Table a { id int }\nTableGroup g1 {\n  a\n}');
+    if (!r.ok) throw new Error('fixture parse failed');
+    expect(computeExportBounds(r.schema, { 'public.a': { x: 0, y: 0 } }, {}, ['public.a'])).toBeNull();
   });
 });

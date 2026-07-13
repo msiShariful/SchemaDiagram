@@ -29,12 +29,17 @@ export interface ElkGraphIn {
   edges: ElkEdgeIn[];
 }
 
-export function buildElkGraph(schema: Schema): ElkGraphIn {
-  const ids = new Set(schema.tables.map((t) => t.id));
+export function buildElkGraph(schema: Schema, hiddenTableIds: readonly string[] = []): ElkGraphIn {
+  // Feature D: lay out only VISIBLE tables. Hidden ones keep their stored
+  // positions because elkResultToPositions only emits laid-out children and
+  // the auto-layout commit only carries returned ids.
+  const hidden = new Set(hiddenTableIds);
+  const visible = schema.tables.filter((t) => !hidden.has(t.id));
+  const ids = new Set(visible.map((t) => t.id));
   return {
     id: 'root',
     layoutOptions: ELK_LAYOUT_OPTIONS,
-    children: schema.tables.map((t) => ({
+    children: visible.map((t) => ({
       id: t.id,
       width: TABLE_WIDTH,
       height: tableHeight(t.fields.length),

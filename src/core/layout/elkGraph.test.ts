@@ -32,6 +32,24 @@ describe('buildElkGraph', () => {
   });
 });
 
+describe('buildElkGraph — hidden tables (Plan 6)', () => {
+  it('lays out only visible tables and drops refs touching hidden ones', () => {
+    const r = parseDbml('Table a { id int }\nTable b { a_id int }\nTable c { id int }\nRef: b.a_id > a.id\n');
+    if (!r.ok) throw new Error('fixture parse failed');
+    const g = buildElkGraph(r.schema, ['public.a']);
+    expect(g.children.map((c) => c.id)).toEqual(['public.b', 'public.c']);
+    expect(g.edges).toEqual([]); // the only ref touches hidden public.a
+  });
+
+  it('default (nothing hidden) is unchanged', () => {
+    const r = parseDbml('Table a { id int }\nTable b { a_id int }\nRef: b.a_id > a.id\n');
+    if (!r.ok) throw new Error('fixture parse failed');
+    const g = buildElkGraph(r.schema);
+    expect(g.children).toHaveLength(2);
+    expect(g.edges).toHaveLength(1);
+  });
+});
+
 describe('elkResultToPositions', () => {
   it('offsets ELK coordinates by the origin', () => {
     expect(elkResultToPositions({ children: [{ id: 't', x: 10, y: 20 }] })).toEqual({

@@ -24,8 +24,11 @@ async function layoutInThread(graph: ElkGraphIn): Promise<Record<string, TablePo
  *  Uses elk-api.js's own ELK class (not elk.bundled.js) with a workerFactory
  *  pointing at elk.worker.ts, elkjs's own worker entry point — see that
  *  file's header comment for why. */
-export function runElkLayout(schema: Schema): Promise<Record<string, TablePosition>> {
-  const graph = buildElkGraph(schema);
+export function runElkLayout(
+  schema: Schema,
+  hiddenTableIds: readonly string[] = [],
+): Promise<Record<string, TablePosition>> {
+  const graph = buildElkGraph(schema, hiddenTableIds);
   if (graph.children.length === 0) return Promise.resolve({});
 
   return new Promise((resolve, reject) => {
