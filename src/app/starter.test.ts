@@ -17,4 +17,10 @@ describe('starter content', () => {
     expect(a.dbml).toBe(STARTER_DBML);
     expect(a.name).toBe('Untitled');
   });
+  it('stamps createdAt on new starter diagrams', () => {
+    const before = Date.now();
+    const a = createStarterDiagram();
+    expect(a.createdAt).toBeGreaterThanOrEqual(before);
+    expect(a.createdAt).toBe(a.updatedAt);
+  });
 });

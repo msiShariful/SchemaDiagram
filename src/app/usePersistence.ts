@@ -27,7 +27,12 @@ function currentRecord(): DiagramRecord | null {
   if (!s.diagramId) return null;
   return {
     id: s.diagramId, name: s.diagramName, dbml: s.source,
-    positions: s.positions, notePositions: s.notePositions, viewport: s.viewport, updatedAt: Date.now(),
+    positions: s.positions, notePositions: s.notePositions,
+    hiddenTableIds: s.hiddenTableIds,
+    viewport: s.viewport, updatedAt: Date.now(),
+    // Only stamp createdAt when the store actually knows it — an autosave of
+    // a pre-Plan-6 record must not invent a birth date.
+    ...(s.diagramCreatedAt !== null ? { createdAt: s.diagramCreatedAt } : {}),
   };
 }
 
@@ -51,7 +56,11 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
     const sameLayout = !compareLayout || (
       JSON.stringify(newest?.positions) === JSON.stringify(rec.positions) &&
       JSON.stringify(newest?.notePositions) === JSON.stringify(rec.notePositions) &&
-      JSON.stringify(newest?.viewport) === JSON.stringify(rec.viewport)
+      JSON.stringify(newest?.viewport) === JSON.stringify(rec.viewport) &&
+      // ?? [] on BOTH sides: a pre-Plan-6 snapshot (undefined) must equal a
+      // live [] — otherwise the first restore after upgrade writes a
+      // spurious checkpoint.
+      JSON.stringify(newest?.hiddenTableIds ?? []) === JSON.stringify(rec.hiddenTableIds ?? [])
     );
     if (newest && newest.dbml === rec.dbml && sameLayout) return;
     await putSnapshot({
@@ -62,6 +71,7 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
       dbml: rec.dbml,
       positions: rec.positions,
       notePositions: rec.notePositions,
+      hiddenTableIds: rec.hiddenTableIds,
       viewport: rec.viewport,
     });
   } catch {
@@ -153,7 +163,10 @@ export async function duplicateDiagram(): Promise<void> {
   invalidatePendingAutosave();
   const cur = currentRecord();
   if (!cur) return;
-  const copy: DiagramRecord = { ...cur, id: nanoid(), name: `${cur.name} copy`, updatedAt: Date.now() };
+  const copy: DiagramRecord = {
+    ...cur, id: nanoid(), name: `${cur.name} copy`,
+    createdAt: Date.now(), updatedAt: Date.now(), // a copy is a NEW document
+  };
   try { await putDiagram(copy); } catch { useAppStore.getState().setStorageUnavailable(true); }
   useAppStore.getState().loadDiagram(copy);
 }
@@ -207,6 +220,7 @@ export interface ImportedDiagram {
   dbml: string;
   positions?: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
+  hiddenTableIds?: string[];
   viewport?: Viewport;
 }
 
@@ -223,8 +237,10 @@ export async function importDiagram(imp: ImportedDiagram): Promise<void> {
     dbml: imp.dbml,
     positions: imp.positions ?? {},
     notePositions: imp.notePositions ?? {},
+    hiddenTableIds: imp.hiddenTableIds ?? [],
     viewport: imp.viewport ?? { x: 40, y: 40, zoom: 1 },
     updatedAt: Date.now(),
+    createdAt: Date.now(),
   };
   try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
   useAppStore.getState().loadDiagram(rec);
@@ -244,8 +260,10 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
   await snapshotIfChanged(cur, true);
   const rec: DiagramRecord = {
     id: cur.id, name: snap.name, dbml: snap.dbml,
-    positions: snap.positions, notePositions: snap.notePositions ?? {}, viewport: snap.viewport,
-    updatedAt: Date.now(),
+    positions: snap.positions, notePositions: snap.notePositions ?? {},
+    hiddenTableIds: snap.hiddenTableIds ?? [],
+    viewport: snap.viewport, updatedAt: Date.now(),
+    ...(cur.createdAt !== undefined ? { createdAt: cur.createdAt } : {}), // restore never changes the birth date
   };
   try { await putDiagram(rec); } catch { useAppStore.getState().setStorageUnavailable(true); }
   // The checkpoint + putDiagram awaits above give a diagram switch/import
@@ -265,7 +283,8 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
     // which autosave would then persist.
     resetCanvasStack();
     useAppStore.setState({
-      diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions, viewport: rec.viewport,
+      diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions,
+      hiddenTableIds: rec.hiddenTableIds, viewport: rec.viewport,
     });
   } else {
     useAppStore.getState().loadDiagram(rec);
@@ -293,7 +312,7 @@ export function usePersistence(): void {
     })();
 
     const unsub = useAppStore.subscribe(
-      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions] as const,
+      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions, s.hiddenTableIds] as const,
       () => scheduleAutosave(),
       { equalityFn: (a, b) => a.every((v, i) => Object.is(v, b[i])) },
     );

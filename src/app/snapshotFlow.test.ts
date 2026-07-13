@@ -25,6 +25,7 @@ const resetStore = () =>
     diagramId: null, diagramName: 'Untitled', source: '', schema: EMPTY_SCHEMA,
     errors: [], stale: false, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null, editorFocusTableId: null, storageUnavailable: false,
+    hiddenTableIds: [], diagramCreatedAt: null,
   });
 
 describe('snapshot + import persistence flows', () => {
@@ -300,5 +301,83 @@ describe('snapshot + import persistence flows', () => {
     expect(st.diagramName).toBe('Imported');
     expect((await getDiagram(a.id))?.dbml).toBe(EDITED); // A kept its flushed edit
     expect(await listDiagrams()).toHaveLength(2);
+  });
+});
+
+describe('createdAt + hiddenTableIds threading (Plan 6)', () => {
+  beforeEach(async () => {
+    await __resetForTests();
+    resetStore();
+    invalidatePendingAutosave();
+  });
+
+  it('importDiagram stamps createdAt and threads hiddenTableIds', async () => {
+    await importDiagram({ name: 'Imp', dbml: BASE, hiddenTableIds: ['public.a'] });
+    const s = useAppStore.getState();
+    expect(s.diagramCreatedAt).not.toBeNull();
+    expect(s.hiddenTableIds).toEqual(['public.a']);
+    const all = await listDiagrams();
+    expect(all[0].createdAt).toBe(s.diagramCreatedAt);
+    expect(all[0].hiddenTableIds).toEqual(['public.a']);
+  });
+
+  it('hiddenTableIds travel through snapshot restore', async () => {
+    const a: PersistedDiagram = { ...diagramA(), hiddenTableIds: ['public.a'] };
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.a']);
+
+    const snap: DiagramSnapshot = {
+      id: 'snap-1', diagramId: a.id, takenAt: 5, name: 'A', dbml: EDITED,
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, hiddenTableIds: ['public.b'],
+    };
+    await putSnapshot(snap);
+    await restoreSnapshot(snap);
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.b']);
+    expect(useAppStore.getState().source).toBe(EDITED);
+  });
+
+  it('restoring an OLD snapshot without hiddenTableIds clears them (backward compat)', async () => {
+    const a: PersistedDiagram = { ...diagramA(), hiddenTableIds: ['public.a'] };
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    const snap: DiagramSnapshot = {
+      id: 'snap-old', diagramId: a.id, takenAt: 5, name: 'A', dbml: EDITED,
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, // pre-Plan-6 row
+    };
+    await putSnapshot(snap);
+    await restoreSnapshot(snap);
+    expect(useAppStore.getState().hiddenTableIds).toEqual([]);
+  });
+
+  it('restore-checkpoint dedupe treats a pre-Plan-6 snapshot (no hiddenTableIds) as []', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a); // hiddenTableIds → []
+    // Plan-3-era snapshot: HAS notePositions (so that compare passes) but
+    // predates hiddenTableIds — the ?? [] normalization is what's under test.
+    const snap: DiagramSnapshot = {
+      id: 'snap-pre6', diagramId: a.id, takenAt: 5, name: 'A', dbml: BASE,
+      positions: {}, notePositions: {}, viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(snap);
+    await restoreSnapshot(snap); // identical text+layout → checkpoint must dedupe
+    expect(await listSnapshots(a.id)).toHaveLength(1); // no spurious checkpoint
+  });
+
+  it('same-text restore patches hiddenTableIds without reloading the diagram', async () => {
+    const a: PersistedDiagram = { ...diagramA(), hiddenTableIds: [] };
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    useAppStore.getState().applyParse(parseDbml(BASE), BASE);
+    const schemaBefore = useAppStore.getState().schema;
+    const snap: DiagramSnapshot = {
+      id: 'snap-same', diagramId: a.id, takenAt: 5, name: 'A', dbml: BASE,
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, hiddenTableIds: ['public.a'],
+    };
+    await putSnapshot(snap);
+    await restoreSnapshot(snap);
+    expect(useAppStore.getState().schema).toBe(schemaBefore); // no blank-canvas reload
+    expect(useAppStore.getState().hiddenTableIds).toEqual(['public.a']);
   });
 });

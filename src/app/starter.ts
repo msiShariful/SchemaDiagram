@@ -41,12 +41,14 @@ Ref: comments.user_id > users.id
 `;
 
 export function createStarterDiagram(): DiagramRecord {
+  const now = Date.now();
   return {
     id: nanoid(),
     name: 'Untitled',
     dbml: STARTER_DBML,
     positions: {},
     viewport: { x: 40, y: 40, zoom: 1 },
-    updatedAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
   };
 }

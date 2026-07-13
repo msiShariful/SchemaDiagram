@@ -123,3 +123,29 @@ describe('serializeProject / parseProject', () => {
     expect(r.error).toContain('viewport');
   });
 });
+
+describe('hiddenTableIds (Plan 6, optional — backward compatible)', () => {
+  it('round-trips hiddenTableIds and accepts files without them', () => {
+    const r = parseProject(serializeProject({ ...input, hiddenTableIds: ['public.a'] }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.project.hiddenTableIds).toEqual(['public.a']);
+
+    const old = parseProject(serializeProject(input)); // pre-Plan-6 shape: no key at all
+    expect(old.ok).toBe(true);
+    if (!old.ok) return;
+    expect('hiddenTableIds' in old.project).toBe(false);
+  });
+
+  it('omits the key when nothing is hidden (files stay byte-stable for old consumers)', () => {
+    expect(serializeProject({ ...input, hiddenTableIds: [] })).not.toContain('hiddenTableIds');
+  });
+
+  it('rejects malformed hiddenTableIds (non-array, non-string entries)', () => {
+    const raw = JSON.parse(serializeProject(input)) as Record<string, unknown>;
+    raw.hiddenTableIds = { 'public.a': true };
+    expect(parseProject(JSON.stringify(raw)).ok).toBe(false);
+    raw.hiddenTableIds = ['public.a', 7];
+    expect(parseProject(JSON.stringify(raw)).ok).toBe(false);
+  });
+});

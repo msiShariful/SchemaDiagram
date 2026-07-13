@@ -11,6 +11,7 @@ export interface ProjectFile {
   dbml: string;
   layout: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
+  hiddenTableIds?: string[]; // optional: pre-Plan-6 files lack it (Feature D view state)
   viewport: Viewport;
 }
 
@@ -23,6 +24,7 @@ export function serializeProject(p: {
   dbml: string;
   positions: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
+  hiddenTableIds?: string[];
   viewport: Viewport;
 }): string {
   const file: ProjectFile = {
@@ -31,6 +33,7 @@ export function serializeProject(p: {
     dbml: p.dbml,
     layout: p.positions,
     notePositions: p.notePositions,
+    hiddenTableIds: p.hiddenTableIds && p.hiddenTableIds.length > 0 ? p.hiddenTableIds : undefined,
     viewport: p.viewport,
   };
   return JSON.stringify(file, null, 2);
@@ -93,6 +96,17 @@ export function parseProject(text: string): ProjectParseResult {
     if (!notePositionsResult.ok) return notePositionsResult;
     notePositions = notePositionsResult.value;
   }
+  // hiddenTableIds is optional (pre-Plan-6 files). It is a plain string
+  // array — no reserved-key hazard (that only exists for object maps) — so
+  // the trust boundary is: array, all entries strings.
+  let hiddenTableIds: string[] | undefined;
+  if (o.hiddenTableIds !== undefined) {
+    const arr = o.hiddenTableIds;
+    if (!Array.isArray(arr) || !arr.every((v): v is string => typeof v === 'string')) {
+      return { ok: false, error: 'Project file "hiddenTableIds" must be an array of table ids.' };
+    }
+    hiddenTableIds = arr;
+  }
   const vp = o.viewport as { x?: unknown; y?: unknown; zoom?: unknown } | null | undefined;
   if (!vp || !isFiniteNumber(vp.x) || !isFiniteNumber(vp.y) || !isFiniteNumber(vp.zoom) || vp.zoom <= 0) {
     return { ok: false, error: 'Project file "viewport" must have numeric x, y and a positive zoom.' };
@@ -105,6 +119,7 @@ export function parseProject(text: string): ProjectParseResult {
       dbml: o.dbml,
       layout: layoutResult.value,
       ...(notePositions !== undefined ? { notePositions } : {}),
+      ...(hiddenTableIds !== undefined ? { hiddenTableIds } : {}),
       viewport: { x: vp.x, y: vp.y, zoom: vp.zoom },
     },
   };
