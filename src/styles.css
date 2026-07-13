@@ -368,3 +368,8 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 /* Plan 7 Feature B: field badges + note dots */
 .field-badges { font-size: 8px; fill: var(--text-dim); letter-spacing: 0.03em; }
 .field-note-dot { font-size: 7px; fill: var(--accent); }
+
+/* Plan 7 Feature A: field-row ref handle (gear-pattern visibility) */
+.ref-handle { fill: var(--accent); stroke: var(--bg-elev); stroke-width: 1.5; opacity: 0; cursor: crosshair; }
+.field-row:hover .ref-handle { opacity: 1; }
+.ref-drag-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }

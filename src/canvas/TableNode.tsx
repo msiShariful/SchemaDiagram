@@ -16,12 +16,13 @@ interface Props {
   selected: boolean;
   onOpenInEditor: (id: string) => void;
   onOpenSettings: (id: string) => void; // stable callback (memo contract) — gear passes the id out
+  onRefDragStart: (tableId: string, fieldName: string, e: React.PointerEvent) => void; // stable (memo contract) — REF-DRAG hand-off to DiagramCanvas
   registerEl: (id: string, el: SVGGElement | null) => void;
 }
 
 export const TableNode = memo(function TableNode({
   table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected,
-  onOpenInEditor, onOpenSettings, registerEl,
+  onOpenInEditor, onOpenSettings, onRefDragStart, registerEl,
 }: Props) {
   const gRef = useRef<SVGGElement | null>(null);
   const drag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -98,6 +99,19 @@ export const TableNode = memo(function TableNode({
                     {badges !== '' && <tspan className="field-badges">{badges} </tspan>}
                     {f.type}
                   </text>
+                  <circle
+                    className="ref-handle"
+                    cx={TABLE_WIDTH - 6}
+                    cy={ROW_HEIGHT / 2}
+                    r={5}
+                    onPointerDown={(e) => {
+                      // REF-DRAG start: never a table drag. stopPropagation
+                      // before the table <g>'s onPointerDown; DiagramCanvas
+                      // owns the gesture (capture on the stable <svg>).
+                      e.stopPropagation();
+                      onRefDragStart(table.id, f.name, e);
+                    }}
+                  />
                 </g>
               );
             })}

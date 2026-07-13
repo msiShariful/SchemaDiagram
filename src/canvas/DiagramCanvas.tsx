@@ -13,15 +13,17 @@ import { rectFromPoints, idsInRect } from './marquee';
 import { effectiveLod } from './lod';
 import { CanvasControls } from './CanvasControls';
 import { visibleWorldRect } from './culling';
-import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
-import { revealTable } from '../editor/editorNav';
+import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight, fieldRowY } from '../core/model/geometry';
+import { revealTable, appendRefLine } from '../editor/editorNav';
 import { runElkLayout } from '../core/layout/elkLayout';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 import { DiagramViewsSidebar } from './DiagramViewsSidebar';
 import { registerCanvasHandle } from './canvasNav';
-import { visibleTableRects } from '../core/model/visibility';
+import { visibleTableRects, effectiveHiddenIds } from '../core/model/visibility';
 import { overlayDepth } from '../app/overlayStack';
+import { fieldDropTarget, isDuplicateRef, type DropField } from './refDrag';
+import { buildRefLine } from '../editor/refEdit';
 
 // Gesture ledger rules — shared by every per-schema-object drag on the canvas
 // (table, note, group; the minimap's viewport drag doesn't carry a
@@ -52,6 +54,16 @@ import { overlayDepth } from '../app/overlayStack';
 //       a chorded button) is ignored rather than hijacking or double-starting
 //       a gesture — this is also what keeps a mid-marquee middle-click from
 //       cancelling the marquee and starting a pan at the same time.
+//   (e) REF-DRAG (Feature A) is a canvas-level gesture like pan/marquee, not
+//       a per-schema-object one, but it shares the same ledger discipline:
+//       pointerId-owned (refDragRef), capture on the stable <svg> (a
+//       mid-gesture parse can unmount the source field row, but never the
+//       svg), buttons===0 bail in onPointerMove, and the [positions] cleanup
+//       effect below also clears a ref-drag whose SOURCE table vanished
+//       mid-gesture. It composes with (d): starting a ref-drag requires
+//       panRef/marqueeState/dragRef all unset, and pan/marquee/table-drag
+//       starters each bail while refDragRef is set — one gesture owns the
+//       canvas at a time.
 // DRAG_THRESHOLD_PX lives in snap.ts (shared with NoteNode's own drag).
 
 interface DragState {
@@ -79,6 +91,8 @@ export function DiagramCanvas() {
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const marqueeRef = useRef<SVGRectElement>(null);
   const marqueeState = useRef<{ pointerId: number; start: Point } | null>(null);
+  const refLineRef = useRef<SVGLineElement>(null);
+  const refDragRef = useRef<{ pointerId: number; from: DropField } | null>(null);
   const spaceDown = useRef(false);
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
   const [layoutBusy, setLayoutBusy] = useState(false);
@@ -134,6 +148,53 @@ export function DiagramCanvas() {
   // the popover itself lives in the HTML layer below, outside the SVG.
   const handleOpenSettings = useCallback((id: string) => setSettingsTableId(id), []);
   const closeSettings = useCallback(() => setSettingsTableId(null), []);
+
+  // REF-DRAG (Feature A): capture on the stable <svg> — a mid-gesture parse
+  // can unmount the source row, but the svg outlives it; the svg's own
+  // pointer handlers below then own move/drop. Gesture ledger rules apply:
+  // pointerId-owned, buttons===0 bail, [positions] cleanup effect.
+  const handleRefDragStart = useCallback((tableId: string, fieldName: string, e: React.PointerEvent) => {
+    // One canvas gesture at a time — incl. an in-flight TABLE drag (dragRef):
+    // a second pointer's handle press must not start a ref-drag mid-move.
+    if (refDragRef.current || panRef.current || marqueeState.current || dragRef.current) return;
+    const s = useAppStore.getState();
+    const table = s.schema.tables.find((t) => t.id === tableId);
+    const pos = s.positions[tableId];
+    const idx = table?.fields.findIndex((f) => f.name === fieldName) ?? -1;
+    if (!table || !pos || idx < 0) return;
+    svgRef.current!.setPointerCapture(e.pointerId);
+    refDragRef.current = {
+      pointerId: e.pointerId,
+      from: { tableId, schemaName: table.schemaName, tableName: table.name, fieldName },
+    };
+    const x = pos.x + TABLE_WIDTH;
+    const y = pos.y + fieldRowY(idx);
+    const line = refLineRef.current;
+    if (line) {
+      line.setAttribute('x1', String(x));
+      line.setAttribute('y1', String(y));
+      line.setAttribute('x2', String(x));
+      line.setAttribute('y2', String(y));
+      line.setAttribute('visibility', 'visible');
+    }
+  }, []);
+
+  const endRefDrag = useCallback((commit: boolean, clientX: number, clientY: number) => {
+    const rd = refDragRef.current;
+    refDragRef.current = null;
+    refLineRef.current?.setAttribute('visibility', 'hidden');
+    if (!rd || !commit) return;
+    const s = useAppStore.getState();
+    const eff = effectiveHiddenIds(s.schema, s.hiddenTableIds, s.collapsedGroupIds);
+    const target = fieldDropTarget(s.schema, s.positions, eff, toWorld(clientX, clientY));
+    // Every refusal cancels SILENTLY (scope rule): no toast, no text written.
+    if (!target) return; // empty canvas / header strip / hidden table
+    if (target.tableId === rd.from.tableId && target.fieldName === rd.from.fieldName) return; // dropped on itself
+    if (isDuplicateRef(s.schema.refs, { tableId: rd.from.tableId, fieldName: rd.from.fieldName }, target)) return; // dbmlv2 parse-error otherwise
+    const line = buildRefLine(rd.from, target);
+    if (line !== null) appendRefLine(line); // ONE transaction; the pipeline draws the edge ~300 ms later
+  }, []);
+  // (toWorld reads refs only — the [] closure stays correct, same as handleMinimapNav.)
 
   // Guide lines are two persistent <line> elements toggled/positioned via
   // direct setAttribute — never React state (perf contract).
@@ -283,6 +344,10 @@ export function DiagramCanvas() {
       dragRef.current = null;
       hideGuides();
     }
+    if (refDragRef.current && !positions[refDragRef.current.from.tableId]) {
+      refDragRef.current = null;
+      refLineRef.current?.setAttribute('visibility', 'hidden');
+    }
     // hideGuides touches refs only — safe to omit from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positions]);
@@ -425,7 +490,7 @@ export function DiagramCanvas() {
   // a time, keyed by pointerId — a second pointer (touch) or a chorded
   // button press can neither hijack nor double-start a gesture.
   const onPointerDownCapture = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (panRef.current || marqueeState.current) return; // a gesture already owns the canvas
+    if (panRef.current || marqueeState.current || refDragRef.current) return; // a gesture already owns the canvas
     const wantPan = e.button === 1 || (e.button === 0 && spaceDown.current);
     if (!wantPan) return;
     e.preventDefault(); // best effort against middle-click autoscroll
@@ -442,11 +507,20 @@ export function DiagramCanvas() {
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (e.target !== svgRef.current) return; // marquee starts on empty canvas only
     if (e.button !== 0) return;
-    if (panRef.current || marqueeState.current) return; // second pointer mid-gesture: ignore
+    if (panRef.current || marqueeState.current || refDragRef.current) return; // second pointer mid-gesture: ignore
     svgRef.current!.setPointerCapture(e.pointerId);
     marqueeState.current = { pointerId: e.pointerId, start: toWorld(e.clientX, e.clientY) };
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rd = refDragRef.current;
+    if (rd) {
+      if (e.pointerId !== rd.pointerId) return;
+      if (e.buttons === 0) { endRefDrag(false, e.clientX, e.clientY); return; } // ghost gesture backstop
+      const w = toWorld(e.clientX, e.clientY);
+      refLineRef.current?.setAttribute('x2', String(w.x));
+      refLineRef.current?.setAttribute('y2', String(w.y));
+      return;
+    }
     const pan = panRef.current;
     if (pan) {
       if (e.pointerId !== pan.pointerId) return; // not the owning pointer
@@ -469,6 +543,11 @@ export function DiagramCanvas() {
     el.setAttribute('visibility', 'visible');
   };
   const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (refDragRef.current) {
+      if (e.pointerId !== refDragRef.current.pointerId) return;
+      endRefDrag(e.type === 'pointerup', e.clientX, e.clientY); // pointercancel → silent cancel
+      return;
+    }
     const pan = panRef.current;
     if (pan) {
       if (e.pointerId !== pan.pointerId) return;
@@ -578,6 +657,7 @@ export function DiagramCanvas() {
                 selected={selectedSet.has(t.id)}
                 onOpenInEditor={revealTable}
                 onOpenSettings={handleOpenSettings}
+                onRefDragStart={handleRefDragStart}
                 registerEl={registerNodeEl}
               />
             );
@@ -596,6 +676,7 @@ export function DiagramCanvas() {
           })}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
+          <line ref={refLineRef} className="ref-drag-line" visibility="hidden" vectorEffect="non-scaling-stroke" />
           <rect ref={marqueeRef} className="marquee" visibility="hidden" vectorEffect="non-scaling-stroke" />
         </g>
       </svg>
