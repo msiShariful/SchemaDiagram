@@ -8,6 +8,7 @@ export interface Field {
   defaultValue: string | null;
   note: string | null;
   isEnum: boolean;
+  enumValues: string[] | null; // the enum's values when isEnum (bare-name lookup) — Feature B tooltips
 }
 
 export interface Table {
@@ -32,6 +33,8 @@ export interface Ref {
   id: string;
   from: RefEndpoint;
   to: RefEndpoint;
+  inline: boolean; // defined in a field's [ref: …] settings — the edge popover refuses text edits and offers Reveal instead
+  pos: { line: number; column: number } | null; // 1-based parse-token start (Reveal target); null if the parser gave no token
 }
 
 export interface EnumDef {

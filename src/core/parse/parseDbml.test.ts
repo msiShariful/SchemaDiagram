@@ -102,3 +102,52 @@ describe('table groups and sticky notes', () => {
     expect(r.schema.notes).toEqual([]);
   });
 });
+
+describe('ref origin: inline flag + pos (Plan 7 Feature A refusal path)', () => {
+  const parse = (src: string) => {
+    const r = parseDbml(src);
+    if (!r.ok) throw new Error(r.errors[0]?.message);
+    return r.schema;
+  };
+
+  it('flags a field-settings ref inline and a standalone Ref line not', () => {
+    const s = parse('Table a { id int }\nTable b { a_id int [pk, ref: > a.id] }\nTable c { a_id int }\nRef: c.a_id > a.id');
+    expect(s.refs).toHaveLength(2);
+    const inline = s.refs.find((r) => r.inline);
+    const standalone = s.refs.find((r) => !r.inline);
+    expect(inline).toBeDefined();
+    expect(standalone).toBeDefined();
+    // the standalone line is line 4
+    expect(standalone!.pos?.line).toBe(4);
+    // the inline token starts inside line 2's settings bracket
+    expect(inline!.pos?.line).toBe(2);
+    expect((inline!.pos?.column ?? 0) > 1).toBe(true);
+  });
+
+  it('an INDENTED standalone Ref stays standalone (column is not the signal)', () => {
+    const s = parse('Table a { x int }\nTable b { p int }\n   Ref: a.x > b.p');
+    expect(s.refs[0].inline).toBe(false);
+  });
+
+  it('a comment ending in a comma before a Ref line cannot fake inline (blanked scan)', () => {
+    const s = parse('Table a { x int }\nTable b { p int }\n// note, with a comma,\nRef: a.x > b.p');
+    expect(s.refs[0].inline).toBe(false);
+  });
+
+  it('named standalone refs with settings stay standalone', () => {
+    const s = parse('Table a { x int }\nTable b { p int }\nRef fk_name: a.x > b.p [delete: cascade]');
+    expect(s.refs[0].inline).toBe(false);
+  });
+});
+
+describe('field enumValues (Plan 7 Feature B tooltips)', () => {
+  it('resolves the enum value list onto enum-typed fields, null elsewhere', () => {
+    const r = parseDbml('Enum status { draft\n live }\nTable t { s status\n n int }');
+    if (!r.ok) throw new Error(r.errors[0]?.message);
+    const [s, n] = r.schema.tables[0].fields;
+    expect(s.isEnum).toBe(true);
+    expect(s.enumValues).toEqual(['draft', 'live']);
+    expect(n.isEnum).toBe(false);
+    expect(n.enumValues).toBeNull();
+  });
+});

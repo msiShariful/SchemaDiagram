@@ -4,6 +4,7 @@ import type {
 } from '../model/types';
 import type { ParseError } from './errors';
 import { normalizeParseErrors } from './errors';
+import { blankNoise } from './blankNoise';
 
 export type { ParseError } from './errors';
 export type ParseResult = { ok: true; schema: Schema } | { ok: false; errors: ParseError[] };
@@ -13,14 +14,26 @@ export function parseDbml(source: string): ParseResult {
     // 'dbmlv2' is the ANTLR-based DBML parser (dbdiagram.io's current syntax);
     // the legacy 'dbml' peg parser rejects single-line blocks like `Table a { id int }`.
     const db = new Parser().parse(source, 'dbmlv2');
-    return { ok: true, schema: normalizeDatabase(db) };
+    return { ok: true, schema: normalizeDatabase(db, blankNoise(source)) };
   } catch (e) {
     return { ok: false, errors: normalizeParseErrors(e) };
   }
 }
 
+// Empirical (8.3.1): parsed refs carry NO inline flag — only `token`. An
+// inline ref's token starts at the `ref:` INSIDE a field's settings bracket,
+// so the previous non-whitespace character is `[` or `,`. A standalone
+// `Ref…` statement is preceded by `}`/`]`/nothing. The scan runs on
+// comment/string-blanked text so `// a comment,` can't fake an inline ref.
+function isInlineRef(blanked: string, offset: number | undefined): boolean {
+  if (offset === undefined) return false; // no token info — standalone; findRefLine still refuses safely
+  let i = offset - 1;
+  while (i >= 0 && /\s/.test(blanked[i])) i--;
+  return i >= 0 && (blanked[i] === '[' || blanked[i] === ',');
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function normalizeDatabase(db: any): Schema {
+function normalizeDatabase(db: any, blanked: string): Schema {
   const tables: Table[] = [];
   const refs: Ref[] = [];
   const enums: EnumDef[] = [];
@@ -37,6 +50,7 @@ function normalizeDatabase(db: any): Schema {
       enumNames.add(en.name);
     }
   }
+  const enumsByName = new Map(enums.map((e) => [e.name, e]));
 
   for (const schema of db.schemas ?? []) {
     const schemaName: string = schema.name ?? 'public';
@@ -51,6 +65,7 @@ function normalizeDatabase(db: any): Schema {
         defaultValue: f.dbdefault != null ? String(f.dbdefault.value) : null,
         note: f.note ? String(f.note) : null,
         isEnum: enumNames.has(f.type?.type_name ?? ''),
+        enumValues: enumsByName.get(f.type?.type_name ?? '')?.values ?? null,
       }));
       tables.push({
         id: `${schemaName}.${t.name}`,
@@ -69,7 +84,16 @@ function normalizeDatabase(db: any): Schema {
         relation: (ep.relation === '1' ? '1' : '*') as Relation,
       }));
       if (eps.length === 2) {
-        refs.push({ id: `ref-${refs.length}-${eps[0].tableId}-${eps[1].tableId}`, from: eps[0], to: eps[1] });
+        const tokenStart = r.token?.start;
+        refs.push({
+          id: `ref-${refs.length}-${eps[0].tableId}-${eps[1].tableId}`,
+          from: eps[0],
+          to: eps[1],
+          inline: isInlineRef(blanked, tokenStart?.offset),
+          pos: typeof tokenStart?.line === 'number'
+            ? { line: tokenStart.line, column: tokenStart.column ?? 1 }
+            : null,
+        });
       }
     }
   }

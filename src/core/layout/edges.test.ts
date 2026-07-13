@@ -24,7 +24,7 @@ Ref: posts.author_id > users.id
     if (!r.ok) throw new Error('parse failed');
     const specs = buildEdgeSpecs({
       ...r.schema,
-      refs: [{ id: 'x', from: { tableId: 'public.ghost', fieldNames: ['id'], relation: '*' }, to: { tableId: 'public.a', fieldNames: ['id'], relation: '1' } }],
+      refs: [{ id: 'x', inline: false, pos: null, from: { tableId: 'public.ghost', fieldNames: ['id'], relation: '*' }, to: { tableId: 'public.a', fieldNames: ['id'], relation: '1' } }],
     });
     expect(specs).toEqual([]);
   });

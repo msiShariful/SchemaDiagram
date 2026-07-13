@@ -7,11 +7,13 @@ const mkTable = (name: string, fieldCount = 3): Table => ({
   id: `public.${name}`, schemaName: 'public', name, alias: null, headerColor: null, note: null,
   fields: Array.from({ length: fieldCount }, (_, i) => ({
     name: `f${i}`, type: 'int', pk: false, unique: false, notNull: false,
-    increment: false, defaultValue: null, note: null, isEnum: false,
+    increment: false, defaultValue: null, note: null, isEnum: false, enumValues: null,
   })),
 });
 const ref = (a: string, b: string) => ({
   id: `r-${a}-${b}`,
+  inline: false as const,
+  pos: null,
   from: { tableId: `public.${a}`, fieldNames: ['f0'], relation: '*' as const },
   to: { tableId: `public.${b}`, fieldNames: ['f0'], relation: '1' as const },
 });

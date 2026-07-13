@@ -6,7 +6,7 @@ const mkTable = (name: string, fieldNames: string[]): Table => ({
   id: `public.${name}`, schemaName: 'public', name, alias: null, headerColor: null, note: null,
   fields: fieldNames.map((n) => ({
     name: n, type: 'int', pk: false, unique: false, notNull: false,
-    increment: false, defaultValue: null, note: null, isEnum: false,
+    increment: false, defaultValue: null, note: null, isEnum: false, enumValues: null,
   })),
 });
 const mkSchema = (tables: Table[]): Schema => ({ tables, refs: [], enums: [], groups: [], notes: [] });

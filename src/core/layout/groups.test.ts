@@ -6,7 +6,7 @@ const mkTable = (name: string, fieldCount: number): Table => ({
   id: `public.${name}`, schemaName: 'public', name, alias: null, headerColor: null, note: null,
   fields: Array.from({ length: fieldCount }, (_, i) => ({
     name: `f${i}`, type: 'int', pk: false, unique: false, notNull: false,
-    increment: false, defaultValue: null, note: null, isEnum: false,
+    increment: false, defaultValue: null, note: null, isEnum: false, enumValues: null,
   })),
 });
 

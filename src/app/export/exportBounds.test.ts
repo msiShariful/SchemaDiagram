@@ -7,7 +7,7 @@ const mkTable = (name: string): Table => ({
   id: `public.${name}`, schemaName: 'public', name, alias: null, headerColor: null, note: null,
   fields: [{
     name: 'id', type: 'int', pk: false, unique: false, notNull: false,
-    increment: false, defaultValue: null, note: null, isEnum: false,
+    increment: false, defaultValue: null, note: null, isEnum: false, enumValues: null,
   }],
 });
 
