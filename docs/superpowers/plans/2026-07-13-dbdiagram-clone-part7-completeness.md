@@ -2664,7 +2664,7 @@ add subscriptions after the existing ones (the `groups`-by-schema memo already i
 npx vitest run && npx tsc --noEmit
 ```
 
-Browser: add `TableGroup g1 { users posts }` to the starter → chevron on the group header; collapse → users+posts unmount, pill `▸ g1 (2)` at the old bbox top-left, ALL starter edges disappear (each touches users/posts — comments' edges too: accepted divergence), minimap loses both rects, fit frames comments+pill area, marquee can't select collapsed members; drag the pill → expand → members moved together (stored positions traveled); Views sidebar: users/posts rows show disabled eyes with the group hint, `public 1/3`; quick-search `users` + Enter → group expands + centers; export SVG while collapsed → pill + comments only, bounds hug them; ELK auto-layout while collapsed → only comments moves; reload → still collapsed (Task 3 threading); expand → exactly as before.
+Browser: add a group to the starter — `TableGroup g1 {` newline `users` newline `posts` newline `}` (NOTE: single-line multi-member TableGroup is a PARSE ERROR on 8.3.1, code 3017 — members must be newline-separated) → chevron on the group header; collapse → users+posts unmount, pill `▸ g1 (2)` at the old bbox top-left, ALL starter edges disappear (each touches users/posts — comments' edges too: accepted divergence), minimap loses both rects, fit frames comments+pill area, marquee can't select collapsed members; drag the pill → expand → members moved together (stored positions traveled); Views sidebar: users/posts rows show disabled eyes with the group hint, `public 1/3`; quick-search `users` + Enter → group expands + centers; export SVG while collapsed → pill + comments only, bounds hug them; ELK auto-layout while collapsed → only comments moves; reload → still collapsed (Task 3 threading); expand → exactly as before.
 
 - [ ] **Step 5: Commit**
 
@@ -3174,7 +3174,7 @@ test('group collapse: pill, hidden members/edges, persists across reload', async
   await page.goto('/');
   await setEditorText(
     page,
-    'Table users { id int }\nTable posts { user_id int [ref: > users.id] }\nTable comments { post_id int [ref: > posts.id] }\nTableGroup g1 { users posts }',
+    'Table users { id int }\nTable posts { user_id int [ref: > users.id] }\nTable comments { post_id int [ref: > posts.id] }\nTableGroup g1 {\n  users\n  posts\n}', // single-line multi-member TableGroup is a parse error (8.3.1 code 3017) — keep members newline-separated
   );
   await expect(page.locator('.table-node')).toHaveCount(3);
   await expect(page.locator('.edge')).toHaveCount(2);
