@@ -215,6 +215,38 @@ export function renameDiagram(name: string): Promise<void> {
   return saveCurrent();
 }
 
+/** Rename an arbitrary diagram from the dashboard (Feature C). The CURRENT
+ *  diagram routes through renameDiagram (store + immediate flush); any other
+ *  row is a plain read-modify-write of its persisted record. Neither path
+ *  repoints the store's diagram, so no autosave invalidation is needed. */
+export async function renameDiagramById(id: string, name: string): Promise<void> {
+  if (useAppStore.getState().diagramId === id) return renameDiagram(name);
+  try {
+    const rec = await getDiagram(id);
+    if (rec) await putDiagram({ ...rec, name: name.trim() || 'Untitled', updatedAt: Date.now() });
+  } catch {
+    useAppStore.getState().setStorageUnavailable(true);
+  }
+}
+
+/** Duplicate any diagram WITHOUT switching to the copy (dashboard kebab).
+ *  saveCurrent() first so duplicating the CURRENT row copies the latest
+ *  in-memory edits rather than a stale record. The current diagram never
+ *  changes, so no autosave invalidation is needed. */
+export async function duplicateDiagramById(id: string): Promise<void> {
+  await saveCurrent();
+  try {
+    const rec = await getDiagram(id);
+    if (!rec) return;
+    await putDiagram({
+      ...rec, id: nanoid(), name: `${rec.name} copy`,
+      createdAt: Date.now(), updatedAt: Date.now(), // a copy is a NEW document
+    });
+  } catch {
+    useAppStore.getState().setStorageUnavailable(true);
+  }
+}
+
 export interface ImportedDiagram {
   name: string;
   dbml: string;
