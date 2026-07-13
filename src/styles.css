@@ -364,3 +364,7 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .shortcuts-row { display: flex; gap: 8px; padding: 3px 0; }
 .shortcuts-row dt { font-family: ui-monospace, monospace; color: var(--text-dim); flex: 1; }
 .shortcuts-row dd { margin: 0; }
+
+/* Plan 7 Feature B: field badges + note dots */
+.field-badges { font-size: 8px; fill: var(--text-dim); letter-spacing: 0.03em; }
+.field-note-dot { font-size: 7px; fill: var(--accent); }

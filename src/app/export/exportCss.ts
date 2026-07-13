@@ -26,6 +26,9 @@ export const EXPORT_CSS = [
   '.note-body { fill: var(--note-bg); stroke: var(--note-border); }',
   '.note-title { font-size: 11px; font-weight: 600; fill: var(--text); }',
   '.note-content { font-size: 11px; color: var(--text); font-family: system-ui, sans-serif; white-space: pre-wrap; overflow: hidden; height: 100%; }',
+  // Plan 7 Feature B: field badges + note dots.
+  '.field-badges { font-size: 8px; fill: var(--text-dim); letter-spacing: 0.03em; }',
+  '.field-note-dot { font-size: 7px; fill: var(--accent); }',
 ].join('\n');
 
 /** Replace every `var(--name)` / `var(--name, fallback)` with a concrete

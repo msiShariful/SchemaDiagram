@@ -2,6 +2,7 @@ import { memo, useRef } from 'react';
 import type { Table, TablePosition } from '../core/model/types';
 import { TABLE_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, tableHeight } from '../core/model/geometry';
 import { type LodLevel } from './lod';
+import { fieldBadges, fieldTooltip } from './fieldMeta';
 
 interface Props {
   table: Table;
@@ -70,22 +71,36 @@ export const TableNode = memo(function TableNode({
       ) : (
         <>
           <rect width={TABLE_WIDTH} height={h} rx={6} className="table-body" />
-          <rect width={TABLE_WIDTH} height={HEADER_HEIGHT} rx={6} className="table-header" fill={table.headerColor ?? undefined} />
-          <text x={10} y={HEADER_HEIGHT / 2} dominantBaseline="central" className="table-title">
-            {table.name}
-          </text>
+          <g className="table-header-g">
+            {table.note !== null && <title>{table.note}</title>}
+            <rect width={TABLE_WIDTH} height={HEADER_HEIGHT} rx={6} className="table-header" fill={table.headerColor ?? undefined} />
+            <text x={10} y={HEADER_HEIGHT / 2} dominantBaseline="central" className="table-title">
+              {table.name}
+            </text>
+          </g>
           {lod === 'full' &&
-            table.fields.map((f, i) => (
-              <g key={f.name} transform={`translate(0, ${HEADER_HEIGHT + i * ROW_HEIGHT})`}>
-                <line x1={0} y1={0} x2={TABLE_WIDTH} y2={0} className="row-line" />
-                <text x={10} y={ROW_HEIGHT / 2} dominantBaseline="central" className={`field-name${f.pk ? ' pk' : ''}`}>
-                  {f.pk ? '🔑 ' : ''}{f.name}
-                </text>
-                <text x={TABLE_WIDTH - 10} y={ROW_HEIGHT / 2} dominantBaseline="central" textAnchor="end" className="field-type">
-                  {f.type}
-                </text>
-              </g>
-            ))}
+            table.fields.map((f, i) => {
+              const badges = fieldBadges(f);
+              const tip = fieldTooltip(f);
+              return (
+                <g key={f.name} className="field-row" transform={`translate(0, ${HEADER_HEIGHT + i * ROW_HEIGHT})`}>
+                  {tip !== null && <title>{tip}</title>}
+                  {/* Full-width transparent hit rect: hover target for the
+                      tooltip and (Task 7) the ref handle. Events bubble to
+                      the table <g> — drag/click behavior unchanged. */}
+                  <rect width={TABLE_WIDTH} height={ROW_HEIGHT} fill="transparent" />
+                  <line x1={0} y1={0} x2={TABLE_WIDTH} y2={0} className="row-line" />
+                  <text x={10} y={ROW_HEIGHT / 2} dominantBaseline="central" className={`field-name${f.pk ? ' pk' : ''}`}>
+                    {f.pk ? '🔑 ' : ''}{f.name}
+                    {f.note !== null && <tspan className="field-note-dot"> ●</tspan>}
+                  </text>
+                  <text x={TABLE_WIDTH - 10} y={ROW_HEIGHT / 2} dominantBaseline="central" textAnchor="end" className="field-type">
+                    {badges !== '' && <tspan className="field-badges">{badges} </tspan>}
+                    {f.type}
+                  </text>
+                </g>
+              );
+            })}
           {/* Gear (Feature B): visible on table hover via CSS. Inline
               closures here are fine — they live INSIDE the memoized
               component; the PROP (onOpenSettings) is what must be stable.
