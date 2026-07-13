@@ -10,7 +10,8 @@ import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
 import { snapPosition, SNAP_TOLERANCE, DRAG_THRESHOLD_PX, type GuideLine } from './snap';
 import { rectFromPoints, idsInRect } from './marquee';
-import { lodLevel } from './lod';
+import { effectiveLod } from './lod';
+import { CanvasControls } from './CanvasControls';
 import { visibleWorldRect } from './culling';
 import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight } from '../core/model/geometry';
 import { revealTable } from '../editor/editorNav';
@@ -112,7 +113,10 @@ export function DiagramCanvas() {
   // the last tick (Task 5's debounced commit), so this re-render fires at
   // gesture end / wheel idle — never per tick.
   const viewport = useAppStore((s) => s.viewport);
-  const lod = lodLevel(viewport.zoom);
+  const lodOverride = useAppStore((s) => s.lodOverride);
+  // Override wins over zoom (Feature E); culling below stays zoom/viewport-
+  // based — the override changes per-table DETAIL, never what is mounted.
+  const lod = effectiveLod(viewport.zoom, lodOverride);
   const viewRect = size.w > 0 ? visibleWorldRect(viewport, size.w, size.h) : null;
 
   // Registry of table <g> elements so multi-drag can move selection members
@@ -185,7 +189,11 @@ export function DiagramCanvas() {
       drag.moved = true;
     }
     const tolerance = SNAP_TOLERANCE / (zoomRef.current ?? 1);
-    const { pos, guides } = snapPosition(raw, drag.size, drag.otherRects, tolerance);
+    // Feature E snap toggle: one getState() field read per move tick — no
+    // subscription, no React work on the imperative drag path.
+    const { pos, guides } = useAppStore.getState().snapEnabled
+      ? snapPosition(raw, drag.size, drag.otherRects, tolerance)
+      : { pos: raw, guides: [] as GuideLine[] };
     const dx = pos.x - drag.base[id].x;
     const dy = pos.y - drag.base[id].y;
     for (const m of drag.members) {
@@ -593,6 +601,7 @@ export function DiagramCanvas() {
         <button onClick={fit}>fit</button>
         <span>{zoomPct}%</span>
       </div>
+      <CanvasControls />
       <DiagramViewsSidebar />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
     </div>

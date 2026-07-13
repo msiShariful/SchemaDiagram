@@ -331,3 +331,30 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   width: 100%; font-size: 12px; padding: 5px 0; border: 1px solid var(--border);
   background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer;
 }
+
+/* Plan 6 Feature E: bottom-left control cluster */
+.canvas-controls {
+  position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-size: 12px; z-index: 10; color: var(--text);
+}
+.canvas-controls > button {
+  border: none; background: none; cursor: pointer; padding: 3px 6px;
+  color: var(--text); border-radius: 4px; display: flex; align-items: center;
+}
+.canvas-controls > button.active { background: var(--selection-bg); color: var(--accent); }
+.lod-select { display: flex; align-items: center; gap: 4px; color: var(--text-dim); }
+.lod-select select {
+  font-size: 12px; padding: 2px 4px; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg); color: var(--text);
+}
+.shortcuts-pop {
+  position: absolute; left: 0; bottom: calc(100% + 8px); width: 300px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); padding: 12px; font-size: 12px;
+}
+.shortcuts-title { font-weight: 600; margin-bottom: 8px; }
+.shortcuts-pop dl { margin: 0; }
+.shortcuts-row { display: flex; gap: 8px; padding: 3px 0; }
+.shortcuts-row dt { font-family: ui-monospace, monospace; color: var(--text-dim); flex: 1; }
+.shortcuts-row dd { margin: 0; }
