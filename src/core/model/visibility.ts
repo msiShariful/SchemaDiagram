@@ -33,3 +33,23 @@ export function visibleTableRects(
     .filter((t) => positions[t.id] && !hidden.has(t.id))
     .map((t) => ({ id: t.id, rect: getTableRect(t, positions[t.id]) }));
 }
+
+/** Effective hidden set (Plan 7): explicit hides ∪ members of collapsed
+ *  groups. DERIVED, never written back into hiddenTableIds — expanding a
+ *  group must not resurrect explicit hides or vice versa. Returns the input
+ *  array untouched when nothing is collapsed so memos keyed on it stay
+ *  referentially stable. */
+export function effectiveHiddenIds(
+  schema: Schema,
+  hiddenTableIds: readonly string[],
+  collapsedGroupIds: readonly string[],
+): readonly string[] {
+  if (collapsedGroupIds.length === 0) return hiddenTableIds;
+  const collapsed = new Set(collapsedGroupIds);
+  const out = new Set(hiddenTableIds);
+  for (const g of schema.groups) {
+    if (!collapsed.has(g.id)) continue;
+    for (const id of g.tableIds) out.add(id);
+  }
+  return [...out];
+}

@@ -12,6 +12,7 @@ export interface ProjectFile {
   layout: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
   hiddenTableIds?: string[]; // optional: pre-Plan-6 files lack it (Feature D view state)
+  collapsedGroupIds?: string[]; // optional: pre-Plan-7 files lack it (group-collapse view state)
   viewport: Viewport;
 }
 
@@ -25,6 +26,7 @@ export function serializeProject(p: {
   positions: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
   hiddenTableIds?: string[];
+  collapsedGroupIds?: string[];
   viewport: Viewport;
 }): string {
   const file: ProjectFile = {
@@ -34,6 +36,7 @@ export function serializeProject(p: {
     layout: p.positions,
     notePositions: p.notePositions,
     hiddenTableIds: p.hiddenTableIds && p.hiddenTableIds.length > 0 ? p.hiddenTableIds : undefined,
+    collapsedGroupIds: p.collapsedGroupIds && p.collapsedGroupIds.length > 0 ? p.collapsedGroupIds : undefined,
     viewport: p.viewport,
   };
   return JSON.stringify(file, null, 2);
@@ -107,6 +110,16 @@ export function parseProject(text: string): ProjectParseResult {
     }
     hiddenTableIds = arr;
   }
+  // collapsedGroupIds is optional (pre-Plan-7 files). Same trust boundary as
+  // hiddenTableIds: a plain string array, no reserved-key hazard.
+  let collapsedGroupIds: string[] | undefined;
+  if (o.collapsedGroupIds !== undefined) {
+    const arr = o.collapsedGroupIds;
+    if (!Array.isArray(arr) || !arr.every((v): v is string => typeof v === 'string')) {
+      return { ok: false, error: 'Project file "collapsedGroupIds" must be an array of group ids.' };
+    }
+    collapsedGroupIds = arr;
+  }
   const vp = o.viewport as { x?: unknown; y?: unknown; zoom?: unknown } | null | undefined;
   if (!vp || !isFiniteNumber(vp.x) || !isFiniteNumber(vp.y) || !isFiniteNumber(vp.zoom) || vp.zoom <= 0) {
     return { ok: false, error: 'Project file "viewport" must have numeric x, y and a positive zoom.' };
@@ -120,6 +133,7 @@ export function parseProject(text: string): ProjectParseResult {
       layout: layoutResult.value,
       ...(notePositions !== undefined ? { notePositions } : {}),
       ...(hiddenTableIds !== undefined ? { hiddenTableIds } : {}),
+      ...(collapsedGroupIds !== undefined ? { collapsedGroupIds } : {}),
       viewport: { x: vp.x, y: vp.y, zoom: vp.zoom },
     },
   };

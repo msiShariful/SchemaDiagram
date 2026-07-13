@@ -74,6 +74,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           positions: r.project.layout,
           notePositions: r.project.notePositions,
           hiddenTableIds: r.project.hiddenTableIds,
+          collapsedGroupIds: r.project.collapsedGroupIds,
           viewport: r.project.viewport,
         });
       } else {

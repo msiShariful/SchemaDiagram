@@ -35,7 +35,8 @@ export function ExportMenu() {
     downloadText(
       serializeProject({
         name: s.diagramName, dbml: s.source, positions: s.positions,
-        notePositions: s.notePositions, hiddenTableIds: s.hiddenTableIds, viewport: s.viewport,
+        notePositions: s.notePositions, hiddenTableIds: s.hiddenTableIds,
+        collapsedGroupIds: s.collapsedGroupIds, viewport: s.viewport,
       }),
       `${safeFilename(s.diagramName)}.json`,
       'application/json',

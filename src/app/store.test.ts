@@ -11,6 +11,7 @@ const reset = () => {
     hoveredTableId: null, storageUnavailable: false, editorFocusTableId: null,
     parsedSource: null, notePositions: {}, selectedTableIds: [],
     hiddenTableIds: [], diagramCreatedAt: null, snapEnabled: true, lodOverride: 'auto',
+    traceEnabled: false, highlightTableId: null, collapsedGroupIds: [], canvasStackVersion: 0,
   });
 };
 
@@ -389,5 +390,96 @@ describe('view state (Plan 6): hiddenTableIds, session flags, createdAt', () => 
     });
     expect(useAppStore.getState().snapEnabled).toBe(false);
     expect(useAppStore.getState().lodOverride).toBe('boxes');
+  });
+});
+
+describe('trace/highlight + collapse + stack version (Plan 7)', () => {
+  beforeEach(reset);
+
+  it('defaults: trace off, no highlight, nothing collapsed, version 0', () => {
+    const s = useAppStore.getState();
+    expect(s.traceEnabled).toBe(false);
+    expect(s.highlightTableId).toBeNull();
+    expect(s.collapsedGroupIds).toEqual([]);
+    expect(s.canvasStackVersion).toBe(0);
+  });
+
+  it('disabling trace clears the highlight', () => {
+    useAppStore.getState().setTraceEnabled(true);
+    useAppStore.getState().setHighlightTable('public.a');
+    useAppStore.getState().setTraceEnabled(false);
+    expect(useAppStore.getState().highlightTableId).toBeNull();
+  });
+
+  it('applyParse prunes a highlight whose table vanished, keeps a live one', () => {
+    const src = 'Table a { id int }\nTable b { id int }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setHighlightTable('public.b');
+    const next = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(next), next);
+    expect(useAppStore.getState().highlightTableId).toBeNull();
+  });
+
+  it('applyParse prunes collapsedGroupIds of deleted groups, keeps live ones', () => {
+    const src = 'Table a { id int }\nTable b { id int }\nTableGroup g1 { a }\nTableGroup g2 { b }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setCollapsedGroups(['public.g1', 'public.g2']);
+    const next = 'Table a { id int }\nTable b { id int }\nTableGroup g1 { a }';
+    useAppStore.getState().applyParse(parseDbml(next), next);
+    expect(useAppStore.getState().collapsedGroupIds).toEqual(['public.g1']);
+  });
+
+  it('a failed parse leaves highlight and collapse untouched (last-good-parse contract)', () => {
+    const src = 'Table a { id int }\nTableGroup g1 { a }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setHighlightTable('public.a');
+    useAppStore.getState().setCollapsedGroups(['public.g1']);
+    useAppStore.getState().applyParse(parseDbml('Table a {'), 'Table a {');
+    expect(useAppStore.getState().highlightTableId).toBe('public.a');
+    expect(useAppStore.getState().collapsedGroupIds).toEqual(['public.g1']);
+  });
+
+  it('collapsing a group deselects its members (hiding deselects)', () => {
+    const src = 'Table a { id int }\nTable b { id int }\nTableGroup g1 { a }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    useAppStore.getState().setSelectedTables(['public.a', 'public.b']);
+    useAppStore.getState().setCollapsedGroups(['public.g1']);
+    expect(useAppStore.getState().selectedTableIds).toEqual(['public.b']);
+  });
+
+  it('canvasStackVersion bumps on commit/undo/redo and load, not on zero-delta commits', () => {
+    const src = 'Table a { id int }';
+    useAppStore.getState().applyParse(parseDbml(src), src);
+    const v0 = useAppStore.getState().canvasStackVersion;
+    useAppStore.getState().commitCanvasCommand({
+      label: 'noop', tables: [{ id: 'public.a', before: { x: 1, y: 1 }, after: { x: 1, y: 1 } }], notes: [],
+    });
+    expect(useAppStore.getState().canvasStackVersion).toBe(v0); // pruned to no-op: no bump
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move', tables: [{ id: 'public.a', before: { x: 1, y: 1 }, after: { x: 9, y: 9 } }], notes: [],
+    });
+    expect(useAppStore.getState().canvasStackVersion).toBe(v0 + 1);
+    useAppStore.getState().undoCanvas();
+    expect(useAppStore.getState().canvasStackVersion).toBe(v0 + 2);
+    useAppStore.getState().redoCanvas();
+    expect(useAppStore.getState().canvasStackVersion).toBe(v0 + 3);
+    useAppStore.getState().loadDiagram({
+      id: 'x', name: 'X', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().canvasStackVersion).toBe(v0 + 4); // stack was reset — buttons must re-read
+  });
+
+  it('loadDiagram loads collapsedGroupIds (defaulting for pre-Plan-7 records) and clears the highlight', () => {
+    useAppStore.getState().setHighlightTable('public.a');
+    useAppStore.getState().loadDiagram({
+      id: 'x', name: 'X', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+      collapsedGroupIds: ['public.g1'],
+    });
+    expect(useAppStore.getState().collapsedGroupIds).toEqual(['public.g1']);
+    expect(useAppStore.getState().highlightTableId).toBeNull();
+    useAppStore.getState().loadDiagram({
+      id: 'y', name: 'Y', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1, // pre-Plan-7 record
+    });
+    expect(useAppStore.getState().collapsedGroupIds).toEqual([]);
   });
 });

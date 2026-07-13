@@ -82,6 +82,10 @@ interface AppState {
   diagramCreatedAt: number | null; // mirrors PersistedDiagram.createdAt so autosave round-trips it
   snapEnabled: boolean; // session-only (not persisted): drag snap on/off (Feature E)
   lodOverride: LodOverride; // session-only (not persisted): detail dropdown (Feature E)
+  traceEnabled: boolean; // session-only: highlight/trace mode toggle (Feature C)
+  highlightTableId: string | null; // session-only: the traced table; cleared on diagram switch, pruned on parse
+  collapsedGroupIds: string[]; // view state: collapsed table groups — persisted like hiddenTableIds, never DBML
+  canvasStackVersion: number; // change counter for the module-level command stack (toolbar undo/redo buttons subscribe to this, never to the stack itself)
   setSource(source: string): void;
   applyParse(result: ParseResult, source: string): void;
   setViewport(v: Viewport): void;
@@ -93,6 +97,9 @@ interface AppState {
   setHiddenTables(ids: string[]): void;
   setSnapEnabled(v: boolean): void;
   setLodOverride(v: LodOverride): void;
+  setTraceEnabled(v: boolean): void;
+  setHighlightTable(id: string | null): void;
+  setCollapsedGroups(ids: string[]): void;
   loadDiagram(rec: DiagramRecord): void;
   commitCanvasCommand(cmd: CanvasCommand): void;
   undoCanvas(): void;
@@ -119,6 +126,10 @@ export const useAppStore = create<AppState>()(
     diagramCreatedAt: null,
     snapEnabled: true,
     lodOverride: 'auto',
+    traceEnabled: false,
+    highlightTableId: null,
+    collapsedGroupIds: [],
+    canvasStackVersion: 0,
 
     setSource: (source) => set({ source }),
 
@@ -127,7 +138,7 @@ export const useAppStore = create<AppState>()(
         set({ errors: result.errors, stale: true });
         return;
       }
-      const { schema: prev, positions, notePositions, selectedTableIds, hiddenTableIds } = get();
+      const { schema: prev, positions, notePositions, selectedTableIds, hiddenTableIds, collapsedGroupIds, highlightTableId } = get();
       const kept = reconcilePositions(prev, result.schema, positions);
       const placed = placeNewTables(result.schema, kept);
       const nextPositions = { ...kept, ...placed };
@@ -146,6 +157,11 @@ export const useAppStore = create<AppState>()(
         notePositions: { ...keptNotes, ...placedNotes },
         selectedTableIds: selectedTableIds.filter((id) => tableIds.has(id)),
         hiddenTableIds: hiddenTableIds.filter((id) => tableIds.has(id)),
+        collapsedGroupIds: (() => {
+          const groupIds = new Set(result.schema.groups.map((g) => g.id));
+          return collapsedGroupIds.filter((id) => groupIds.has(id));
+        })(),
+        highlightTableId: highlightTableId !== null && tableIds.has(highlightTableId) ? highlightTableId : null,
         errors: [],
         stale: false,
         parsedSource: source,
@@ -162,19 +178,20 @@ export const useAppStore = create<AppState>()(
       set((s) => ({
         positions: applyDeltas(s.positions, cmd.tables, 'after'),
         notePositions: applyDeltas(s.notePositions, cmd.notes, 'after'),
+        canvasStackVersion: s.canvasStackVersion + 1, // rides the existing gesture-end set()
       }));
     },
 
     undoCanvas: () => {
       const cmd = canvasStack.undo();
       if (!cmd) return;
-      set((s) => applyCommandSide(s, cmd, 'before'));
+      set((s) => ({ ...applyCommandSide(s, cmd, 'before'), canvasStackVersion: s.canvasStackVersion + 1 }));
     },
 
     redoCanvas: () => {
       const cmd = canvasStack.redo();
       if (!cmd) return;
-      set((s) => applyCommandSide(s, cmd, 'after'));
+      set((s) => ({ ...applyCommandSide(s, cmd, 'after'), canvasStackVersion: s.canvasStackVersion + 1 }));
     },
 
     setViewport: (viewport) => set({ viewport }),
@@ -196,10 +213,28 @@ export const useAppStore = create<AppState>()(
       }),
     setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
     setLodOverride: (lodOverride) => set({ lodOverride }),
+    setTraceEnabled: (traceEnabled) =>
+      set((s) => ({ traceEnabled, highlightTableId: traceEnabled ? s.highlightTableId : null })),
+    setHighlightTable: (highlightTableId) => set({ highlightTableId }),
+    setCollapsedGroups: (collapsedGroupIds) =>
+      set((s) => {
+        // Collapsing hides members ⇒ deselect them (same rationale as
+        // setHiddenTables: a hidden table left selected would be silently
+        // moved by the next multi-select drag). Group-header drags remain
+        // the membership-based exception.
+        const collapsed = new Set(collapsedGroupIds);
+        const hiddenByCollapse = new Set(
+          s.schema.groups.filter((g) => collapsed.has(g.id)).flatMap((g) => g.tableIds),
+        );
+        return {
+          collapsedGroupIds,
+          selectedTableIds: s.selectedTableIds.filter((id) => !hiddenByCollapse.has(id)),
+        };
+      }),
 
     loadDiagram: (rec) => {
       resetCanvasStack();
-      set({
+      set((s) => ({
         diagramId: rec.id,
         diagramName: rec.name,
         source: rec.dbml,
@@ -215,8 +250,11 @@ export const useAppStore = create<AppState>()(
         selectedTableIds: [],
         hiddenTableIds: rec.hiddenTableIds ?? [], // pre-Plan-6 records: nothing hidden
         diagramCreatedAt: rec.createdAt ?? null,
-        // snapEnabled / lodOverride deliberately untouched: session state.
-      });
+        collapsedGroupIds: rec.collapsedGroupIds ?? [], // pre-Plan-7 records: nothing collapsed
+        highlightTableId: null, // it named a table of the OLD diagram
+        canvasStackVersion: s.canvasStackVersion + 1, // resetCanvasStack() above emptied the stack — buttons must re-read
+        // traceEnabled / snapEnabled / lodOverride deliberately untouched: session state.
+      }));
     },
   })),
 );

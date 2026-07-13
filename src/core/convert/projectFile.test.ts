@@ -149,3 +149,22 @@ describe('hiddenTableIds (Plan 6, optional — backward compatible)', () => {
     expect(parseProject(JSON.stringify(raw)).ok).toBe(false);
   });
 });
+
+describe('collapsedGroupIds (Plan 7, optional — backward compatible)', () => {
+  it('round-trips, omits when empty, and rejects malformed values', () => {
+    const r = parseProject(serializeProject({ ...input, collapsedGroupIds: ['public.g1'] }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.project.collapsedGroupIds).toEqual(['public.g1']);
+
+    expect(serializeProject({ ...input, collapsedGroupIds: [] })).not.toContain('collapsedGroupIds');
+    const old = parseProject(serializeProject(input));
+    expect(old.ok && !('collapsedGroupIds' in old.project)).toBe(true);
+
+    const raw = JSON.parse(serializeProject(input)) as Record<string, unknown>;
+    raw.collapsedGroupIds = 'public.g1';
+    expect(parseProject(JSON.stringify(raw)).ok).toBe(false);
+    raw.collapsedGroupIds = ['public.g1', 7];
+    expect(parseProject(JSON.stringify(raw)).ok).toBe(false);
+  });
+});

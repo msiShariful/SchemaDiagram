@@ -26,6 +26,7 @@ const resetStore = () =>
     errors: [], stale: false, positions: {}, viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null, editorFocusTableId: null, storageUnavailable: false,
     hiddenTableIds: [], diagramCreatedAt: null,
+    collapsedGroupIds: [],
   });
 
 describe('snapshot + import persistence flows', () => {
@@ -379,5 +380,56 @@ describe('createdAt + hiddenTableIds threading (Plan 6)', () => {
     await restoreSnapshot(snap);
     expect(useAppStore.getState().schema).toBe(schemaBefore); // no blank-canvas reload
     expect(useAppStore.getState().hiddenTableIds).toEqual(['public.a']);
+  });
+});
+
+describe('collapsedGroupIds threading (Plan 7 — the hiddenTableIds precedent)', () => {
+  beforeEach(async () => {
+    await __resetForTests();
+    resetStore();
+    invalidatePendingAutosave();
+  });
+
+  it('importDiagram threads collapsedGroupIds', async () => {
+    await importDiagram({ name: 'Imp', dbml: BASE, collapsedGroupIds: ['public.g1'] });
+    expect(useAppStore.getState().collapsedGroupIds).toEqual(['public.g1']);
+    const all = await listDiagrams();
+    expect(all[0].collapsedGroupIds).toEqual(['public.g1']);
+  });
+
+  it('collapsedGroupIds travel through snapshot restore; old snapshots clear them', async () => {
+    const a: PersistedDiagram = { ...diagramA(), collapsedGroupIds: ['public.g1'] };
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a);
+    expect(useAppStore.getState().collapsedGroupIds).toEqual(['public.g1']);
+
+    const snap: DiagramSnapshot = {
+      id: 'snap-c1', diagramId: a.id, takenAt: 5, name: 'A', dbml: EDITED,
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, collapsedGroupIds: ['public.g2'],
+    };
+    await putSnapshot(snap);
+    await restoreSnapshot(snap);
+    expect(useAppStore.getState().collapsedGroupIds).toEqual(['public.g2']);
+
+    const old: DiagramSnapshot = {
+      id: 'snap-c2', diagramId: a.id, takenAt: 6, name: 'A', dbml: BASE,
+      positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, // pre-Plan-7 row
+    };
+    await putSnapshot(old);
+    await restoreSnapshot(old);
+    expect(useAppStore.getState().collapsedGroupIds).toEqual([]);
+  });
+
+  it('restore-checkpoint dedupe treats a pre-Plan-7 snapshot (no collapsedGroupIds) as []', async () => {
+    const a = diagramA();
+    await putDiagram(a);
+    useAppStore.getState().loadDiagram(a); // collapsedGroupIds → []
+    const snap: DiagramSnapshot = {
+      id: 'snap-pre7', diagramId: a.id, takenAt: 5, name: 'A', dbml: BASE,
+      positions: {}, notePositions: {}, hiddenTableIds: [], viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    await putSnapshot(snap);
+    await restoreSnapshot(snap); // identical text+layout → must dedupe, not checkpoint
+    expect(await listSnapshots(a.id)).toHaveLength(1);
   });
 });

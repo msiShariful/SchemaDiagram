@@ -29,6 +29,7 @@ function currentRecord(): DiagramRecord | null {
     id: s.diagramId, name: s.diagramName, dbml: s.source,
     positions: s.positions, notePositions: s.notePositions,
     hiddenTableIds: s.hiddenTableIds,
+    collapsedGroupIds: s.collapsedGroupIds,
     viewport: s.viewport, updatedAt: Date.now(),
     // Only stamp createdAt when the store actually knows it — an autosave of
     // a pre-Plan-6 record must not invent a birth date.
@@ -61,6 +62,8 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
       // live [] — otherwise the first restore after upgrade writes a
       // spurious checkpoint.
       JSON.stringify(newest?.hiddenTableIds ?? []) === JSON.stringify(rec.hiddenTableIds ?? [])
+      &&
+      JSON.stringify(newest?.collapsedGroupIds ?? []) === JSON.stringify(rec.collapsedGroupIds ?? [])
     );
     if (newest && newest.dbml === rec.dbml && sameLayout) return;
     await putSnapshot({
@@ -72,6 +75,7 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
       positions: rec.positions,
       notePositions: rec.notePositions,
       hiddenTableIds: rec.hiddenTableIds,
+      collapsedGroupIds: rec.collapsedGroupIds,
       viewport: rec.viewport,
     });
   } catch {
@@ -242,6 +246,7 @@ export interface ImportedDiagram {
   positions?: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
   hiddenTableIds?: string[];
+  collapsedGroupIds?: string[];
   viewport?: Viewport;
 }
 
@@ -259,6 +264,7 @@ export async function importDiagram(imp: ImportedDiagram): Promise<void> {
     positions: imp.positions ?? {},
     notePositions: imp.notePositions ?? {},
     hiddenTableIds: imp.hiddenTableIds ?? [],
+    collapsedGroupIds: imp.collapsedGroupIds ?? [],
     viewport: imp.viewport ?? { x: 40, y: 40, zoom: 1 },
     updatedAt: Date.now(),
     createdAt: Date.now(),
@@ -283,6 +289,7 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
     id: cur.id, name: snap.name, dbml: snap.dbml,
     positions: snap.positions, notePositions: snap.notePositions ?? {},
     hiddenTableIds: snap.hiddenTableIds ?? [],
+    collapsedGroupIds: snap.collapsedGroupIds ?? [],
     viewport: snap.viewport, updatedAt: Date.now(),
     ...(cur.createdAt !== undefined ? { createdAt: cur.createdAt } : {}), // restore never changes the birth date
   };
@@ -305,7 +312,8 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
     resetCanvasStack();
     useAppStore.setState({
       diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions,
-      hiddenTableIds: rec.hiddenTableIds, viewport: rec.viewport,
+      hiddenTableIds: rec.hiddenTableIds, collapsedGroupIds: rec.collapsedGroupIds, viewport: rec.viewport,
+      canvasStackVersion: useAppStore.getState().canvasStackVersion + 1, // resetCanvasStack() just ran
     });
   } else {
     useAppStore.getState().loadDiagram(rec);
@@ -333,7 +341,7 @@ export function usePersistence(): void {
     })();
 
     const unsub = useAppStore.subscribe(
-      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions, s.hiddenTableIds] as const,
+      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions, s.hiddenTableIds, s.collapsedGroupIds] as const,
       () => scheduleAutosave(),
       { equalityFn: (a, b) => a.every((v, i) => Object.is(v, b[i])) },
     );
