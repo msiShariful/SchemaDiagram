@@ -136,6 +136,11 @@ export function scheduleAutosave(debounceMs: number = AUTOSAVE_DEBOUNCE_MS): voi
 }
 
 export async function switchDiagram(id: string): Promise<void> {
+  // Already the current diagram: reloading it would reset positions/schema
+  // and wipe the canvas undo stack for no actual change. Both dashboard call
+  // sites (row click, "Open" menu item) route through here, so one guard
+  // covers both.
+  if (id === useAppStore.getState().diagramId) return;
   await saveCurrent();
   invalidatePendingAutosave();
   try {

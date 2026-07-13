@@ -16,12 +16,20 @@ function EyeIcon({ off }: { off: boolean }) {
   );
 }
 
+interface Props {
+  // Expanded flag lifted to DiagramCanvas (session-local, deliberately not
+  // persisted / not in the zustand store) so it can toggle a class on
+  // .canvas-wrap and shift the zoom controls + minimap out from under the
+  // panel. setExpanded is a plain useState setter — referentially stable.
+  expanded: boolean;
+  setExpanded: (v: boolean) => void;
+}
+
 /** Diagram Views (Feature D). Table visibility is VIEW state — hiddenTableIds
  *  in the store, persisted with the diagram, never written to DBML. Search
  *  filters which rows are LISTED; the schema counts and the schema-level eye
  *  always operate on the schema's FULL table set. */
-export function DiagramViewsSidebar() {
-  const [expanded, setExpanded] = useState(false); // session-local, deliberately not persisted
+export function DiagramViewsSidebar({ expanded, setExpanded }: Props) {
   const [query, setQuery] = useState('');
   const tables = useAppStore((s) => s.schema.tables);
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
@@ -39,6 +47,13 @@ export function DiagramViewsSidebar() {
     setHiddenTables(
       hidden.has(id) ? hiddenTableIds.filter((h) => h !== id) : [...hiddenTableIds, id],
     );
+  };
+  // Clicking a HIDDEN table's name centers on a table with no mounted node
+  // (flash targets nothing). Unhide first — "show me this table" is the
+  // intent — then center; the eye stays the pure visibility control.
+  const centerOn = (id: string) => {
+    if (hidden.has(id)) setHiddenTables(hiddenTableIds.filter((h) => h !== id));
+    centerOnTable(id);
   };
   const toggleSchema = (members: Table[]) => {
     const ids = members.map((t) => t.id);
@@ -92,7 +107,7 @@ export function DiagramViewsSidebar() {
               </div>
               {listed.map((t) => (
                 <div key={t.id} className="views-table-row">
-                  <button className="views-name" title="Center on this table" onClick={() => centerOnTable(t.id)}>
+                  <button className="views-name" title="Center on this table" onClick={() => centerOn(t.id)}>
                     {t.name}
                   </button>
                   <button className="views-eye" aria-label="Toggle visibility" onClick={() => toggleTable(t.id)}>

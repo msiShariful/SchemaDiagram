@@ -82,6 +82,9 @@ export function DiagramCanvas() {
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
   const [layoutBusy, setLayoutBusy] = useState(false);
   const [settingsTableId, setSettingsTableId] = useState<string | null>(null);
+  // Lifted from DiagramViewsSidebar so the expanded panel can shift the
+  // zoom controls + minimap out from under it via a class on .canvas-wrap.
+  const [viewsOpen, setViewsOpen] = useState(false);
 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
@@ -533,7 +536,7 @@ export function DiagramCanvas() {
   };
 
   return (
-    <div className="canvas-wrap">
+    <div className={`canvas-wrap${viewsOpen ? ' views-open' : ''}`}>
       <svg
         ref={svgRef}
         className="diagram-canvas"
@@ -602,7 +605,7 @@ export function DiagramCanvas() {
         <span>{zoomPct}%</span>
       </div>
       <CanvasControls />
-      <DiagramViewsSidebar />
+      <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
     </div>
   );

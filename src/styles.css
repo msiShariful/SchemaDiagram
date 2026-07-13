@@ -113,7 +113,12 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .zoom-controls {
   position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; align-items: center;
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px;
+  transition: right 0.15s ease;
 }
+/* Feature D panel is 260px + 12px gap: shift the bottom-right cluster left
+   while it's expanded so it doesn't cover fit/auto/zoom (occlusion fix). */
+.canvas-wrap.views-open .zoom-controls { right: 272px; }
+.canvas-wrap.views-open .minimap { right: 272px; }
 .zoom-controls button { border: none; background: none; font-size: 14px; cursor: pointer; padding: 2px 6px; color: var(--text); }
 .format-button, .theme-button { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 4px; cursor: pointer; }
 .format-button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -126,6 +131,7 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   position: absolute; right: 12px; bottom: 52px; display: block;
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
   opacity: 0.92; cursor: pointer;
+  transition: right 0.15s ease;
 }
 .minimap-table { fill: var(--table-header); }
 .minimap-view { fill: var(--accent); fill-opacity: 0.15; stroke: var(--accent); stroke-width: 1; }

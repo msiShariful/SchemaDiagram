@@ -4,7 +4,7 @@ import { useAppStore } from './store';
 import { EMPTY_SCHEMA } from '../core/model/types';
 import { putDiagram, getDiagram, listDiagrams, __resetForTests } from '../core/persist/repository';
 import type { PersistedDiagram } from '../core/persist/repository';
-import { renameDiagramById, duplicateDiagramById, invalidatePendingAutosave } from './usePersistence';
+import { renameDiagramById, duplicateDiagramById, invalidatePendingAutosave, switchDiagram } from './usePersistence';
 
 const rec = (id: string, name: string, over: Partial<PersistedDiagram> = {}): PersistedDiagram => ({
   id, name, dbml: 'Table a { id int }', positions: {},
@@ -62,5 +62,20 @@ describe('dashboard persistence helpers (Plan 6)', () => {
     await duplicateDiagramById('current');
     const copy = (await listDiagrams()).find((d) => d.name === 'Current copy');
     expect(copy?.dbml).toBe('Table b { id int }'); // saveCurrent() flushed first
+  });
+
+  it('switchDiagram to the CURRENT diagram is a no-op — does not wipe the canvas undo stack', async () => {
+    const cur = rec('current', 'Current', { positions: { a: { x: 0, y: 0 } } });
+    await putDiagram(cur);
+    useAppStore.getState().loadDiagram(cur);
+    useAppStore.getState().commitCanvasCommand({
+      label: 'move table',
+      tables: [{ id: 'a', before: { x: 0, y: 0 }, after: { x: 50, y: 50 } }],
+      notes: [],
+    });
+    expect(useAppStore.getState().positions.a).toEqual({ x: 50, y: 50 });
+    await switchDiagram('current'); // same id: reloading would call resetCanvasStack()
+    useAppStore.getState().undoCanvas();
+    expect(useAppStore.getState().positions.a).toEqual({ x: 0, y: 0 }); // undo still works: stack survived
   });
 });

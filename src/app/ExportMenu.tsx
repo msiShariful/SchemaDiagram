@@ -18,8 +18,11 @@ export function ExportMenu() {
   const stale = useAppStore((s) => s.stale);
   const errors = useAppStore((s) => s.errors);
   const tableCount = useAppStore((s) => s.schema.tables.length);
+  const hiddenCount = useAppStore((s) => s.hiddenTableIds.length);
   const sqlDisabled = stale || errors.length > 0;
-  const imageDisabled = tableCount === 0;
+  // Gate on VISIBLE tables, not total: with every table hidden, SVG would
+  // silently no-op and PNG would alert a misleading "canvas too small" error.
+  const imageDisabled = tableCount - hiddenCount <= 0;
 
   const exportDbml = () => {
     const s = useAppStore.getState();
