@@ -73,6 +73,8 @@ interface AppState {
   positions: Record<string, TablePosition>;
   viewport: Viewport;
   hoveredTableId: string | null;
+  hoveredRefId: string | null; // edge under the pointer (relationship hover highlight)
+  hoveredField: { tableId: string; fieldName: string } | null; // field row under the pointer
   editorFocusTableId: string | null;
   storageUnavailable: boolean;
   parsedSource: string | null;
@@ -91,6 +93,8 @@ interface AppState {
   applyParse(result: ParseResult, source: string): void;
   setViewport(v: Viewport): void;
   setHoveredTable(id: string | null): void;
+  setHoveredRef(id: string | null): void;
+  setHoveredField(f: { tableId: string; fieldName: string } | null): void;
   setEditorFocusTable(editorFocusTableId: string | null): void;
   setDiagramName(name: string): void;
   setStorageUnavailable(v: boolean): void;
@@ -119,6 +123,8 @@ export const useAppStore = create<AppState>()(
     positions: {},
     viewport: { x: 0, y: 0, zoom: 1 },
     hoveredTableId: null,
+    hoveredRefId: null,
+    hoveredField: null,
     editorFocusTableId: null,
     storageUnavailable: false,
     parsedSource: null,
@@ -199,6 +205,8 @@ export const useAppStore = create<AppState>()(
 
     setViewport: (viewport) => set({ viewport }),
     setHoveredTable: (hoveredTableId) => set({ hoveredTableId }),
+    setHoveredRef: (hoveredRefId) => set({ hoveredRefId }),
+    setHoveredField: (hoveredField) => set({ hoveredField }),
     setEditorFocusTable: (editorFocusTableId) => set({ editorFocusTableId }),
     setDiagramName: (diagramName) => set({ diagramName }),
     setStorageUnavailable: (storageUnavailable) => set({ storageUnavailable }),
@@ -250,6 +258,8 @@ export const useAppStore = create<AppState>()(
         stale: true, // until the parse pipeline catches up
         parsedSource: null,
         hoveredTableId: null,
+        hoveredRefId: null, // pointerleave never fires for unmounted edges
+        hoveredField: null,
         editorFocusTableId: null,
         selectedTableIds: [],
         hiddenTableIds: rec.hiddenTableIds ?? [], // pre-Plan-6 records: nothing hidden

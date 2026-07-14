@@ -19,11 +19,13 @@ interface Props {
   onOpenSettings: (id: string) => void; // stable callback (memo contract) — gear passes the id out
   onRefDragStart: (tableId: string, fieldName: string, e: React.PointerEvent) => void; // stable (memo contract) — REF-DRAG hand-off to DiagramCanvas
   registerEl: (id: string, el: SVGGElement | null) => void;
+  onFieldHover: (f: { tableId: string; fieldName: string } | null) => void; // stable store action (memo contract)
+  hotFields: readonly string[] | null; // endpoint rows of the hovered edge; null (stable) for uninvolved tables
 }
 
 export const TableNode = memo(function TableNode({
   table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected, dimmed,
-  onOpenInEditor, onOpenSettings, onRefDragStart, registerEl,
+  onOpenInEditor, onOpenSettings, onRefDragStart, registerEl, onFieldHover, hotFields,
 }: Props) {
   const gRef = useRef<SVGGElement | null>(null);
   const drag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -101,7 +103,13 @@ export const TableNode = memo(function TableNode({
               // A truncated name is recovered through the tooltip.
               const tip = fit.nameTruncated ? (meta !== null ? `${f.name}\n${meta}` : f.name) : meta;
               return (
-                <g key={f.name} className="field-row" transform={`translate(0, ${HEADER_HEIGHT + i * ROW_HEIGHT})`}>
+                <g
+                  key={f.name}
+                  className={`field-row${hotFields?.includes(f.name) ? ' hot' : ''}`}
+                  transform={`translate(0, ${HEADER_HEIGHT + i * ROW_HEIGHT})`}
+                  onPointerEnter={() => onFieldHover({ tableId: table.id, fieldName: f.name })}
+                  onPointerLeave={() => onFieldHover(null)}
+                >
                   {tip !== null && <title>{tip}</title>}
                   {/* Full-width transparent hit rect: hover target for the
                       tooltip and (Task 7) the ref handle. Events bubble to

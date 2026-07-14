@@ -511,3 +511,6 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   border-radius: 3px; padding: 0 4px; color: var(--text-dim); background: var(--bg-panel);
 }
 .arrange-desc { font-size: 11px; color: var(--text-dim); line-height: 1.45; }
+
+/* Relationship hover: the hovered edge's endpoint rows tint in both tables. */
+.field-row.hot > rect:first-of-type { fill: var(--selection-bg); }

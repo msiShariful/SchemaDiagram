@@ -43,6 +43,9 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const hoveredTableId = useAppStore((s) => s.hoveredTableId);
+  const hoveredRefId = useAppStore((s) => s.hoveredRefId);
+  const hoveredField = useAppStore((s) => s.hoveredField);
+  const setHoveredRef = useAppStore((s) => s.setHoveredRef);
   const traceEnabled = useAppStore((s) => s.traceEnabled);
   const highlightTableId = useAppStore((s) => s.highlightTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
@@ -108,9 +111,23 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
         }
         const p = edgePath(spec, positions, tablesById);
         if (!p) return null;
+        // Field hover lights only the edges anchored at THAT row (dbdiagram
+        // behavior) — matched by index → name via the endpoint tables.
+        const fieldHot =
+          hoveredField !== null &&
+          ((hoveredField.tableId === spec.fromTableId &&
+            tablesById.get(spec.fromTableId)?.fields[spec.fromFieldIndex]?.name === hoveredField.fieldName) ||
+            (hoveredField.tableId === spec.toTableId &&
+              tablesById.get(spec.toTableId)?.fields[spec.toFieldIndex]?.name === hoveredField.fieldName));
+        // Table-hover glow (all edges of the table) YIELDS while a specific
+        // field row in that table is hovered — the narrow highlight wins.
+        const tableHot =
+          (hoveredTableId === spec.fromTableId || hoveredTableId === spec.toTableId) &&
+          (hoveredField === null || hoveredField.tableId !== hoveredTableId);
         const hot =
-          hoveredTableId === spec.fromTableId ||
-          hoveredTableId === spec.toTableId ||
+          hoveredRefId === spec.id ||
+          fieldHot ||
+          tableHot ||
           selectedSet.has(spec.fromTableId) ||
           selectedSet.has(spec.toTableId);
         const dimmed =
@@ -127,6 +144,8 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
               d={p.d}
               ref={(el) => { if (el) hitRefs.current.set(spec.id, el); else hitRefs.current.delete(spec.id); }}
               onClick={(e) => onEdgeClick(spec.id, e.clientX, e.clientY)}
+              onPointerEnter={() => setHoveredRef(spec.id)}
+              onPointerLeave={() => setHoveredRef(null)}
             />
             <text x={p.label1.x} y={p.label1.y} className="edge-label">{p.label1.text}</text>
             <text x={p.label2.x} y={p.label2.y} className="edge-label">{p.label2.text}</text>

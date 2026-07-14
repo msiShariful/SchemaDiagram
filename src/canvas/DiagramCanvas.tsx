@@ -116,6 +116,21 @@ export function DiagramCanvas() {
   const positions = useAppStore((s) => s.positions);
   const notePositions = useAppStore((s) => s.notePositions);
   const setHoveredTable = useAppStore((s) => s.setHoveredTable);
+  const setHoveredField = useAppStore((s) => s.setHoveredField);
+  // Edge-hover -> tint BOTH endpoint field rows. hoveredRefId changes only on
+  // edge enter/leave (low frequency); hoveredField deliberately NOT
+  // subscribed here - row hover must never re-render the whole canvas.
+  const hoveredRefId = useAppStore((s) => s.hoveredRefId);
+  const hotFieldsByTable = useMemo(() => {
+    if (hoveredRefId === null) return null;
+    const ref = schema.refs.find((r) => r.id === hoveredRefId);
+    if (!ref) return null;
+    const m = new Map<string, string[]>();
+    m.set(ref.from.tableId, [...ref.from.fieldNames]);
+    // self-refs: merge, don't overwrite
+    m.set(ref.to.tableId, [...(m.get(ref.to.tableId) ?? []), ...ref.to.fieldNames]);
+    return m;
+  }, [schema, hoveredRefId]);
   const editorFocusTableId = useAppStore((s) => s.editorFocusTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
@@ -806,6 +821,8 @@ export function DiagramCanvas() {
                 onLiveMove={handleLiveMove}
                 onCommitMove={handleCommitMove}
                 onHover={setHoveredTable}
+                onFieldHover={setHoveredField}
+                hotFields={hotFieldsByTable?.get(t.id) ?? null}
                 focused={t.id === editorFocusTableId}
                 selected={selectedSet.has(t.id)}
                 dimmed={keepSet !== null && !keepSet.has(t.id)}
