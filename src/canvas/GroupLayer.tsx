@@ -1,11 +1,8 @@
 import { memo, useMemo, useRef } from 'react';
 import { useAppStore } from '../app/store';
-import { computeGroupRect, GROUP_HEADER_HEIGHT } from '../core/layout/groups';
+import { computeGroupRect, GROUP_HEADER_HEIGHT, GROUP_PILL_W, GROUP_PILL_H } from '../core/layout/groups';
 import { effectiveHiddenIds, omitHidden } from '../core/model/visibility';
 import type { TablePosition } from '../core/model/types';
-
-const GROUP_PILL_W = 200;
-const GROUP_PILL_H = 36;
 
 interface Props {
   zoomRef: React.RefObject<number>;

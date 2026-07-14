@@ -3,6 +3,10 @@ import { getTableRect } from '../model/geometry';
 
 export const GROUP_PADDING = 24;
 export const GROUP_HEADER_HEIGHT = 24;
+// Collapsed-group pill dimensions (GroupLayer renders it; export bounds must
+// account for it too — hoisted here so both stay in lockstep, spec §final-review).
+export const GROUP_PILL_W = 200;
+export const GROUP_PILL_H = 36;
 
 /** Bounding box of the group's positioned member tables, padded, with extra
  *  headroom for the header strip. Null when nothing is positioned yet. */

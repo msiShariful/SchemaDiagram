@@ -72,3 +72,38 @@ describe('computeExportBounds — hidden tables (Plan 6)', () => {
     expect(computeExportBounds(r.schema, { 'public.a': { x: 0, y: 0 } }, {}, ['public.a'])).toBeNull();
   });
 });
+
+describe('computeExportBounds — collapsed group pills (final-review fix)', () => {
+  it('unions a collapsed group pill rect (not the member table\'s own rect) even far outside other content', () => {
+    const s: Schema = {
+      tables: [mkTable('a'), mkTable('b')], refs: [], enums: [], notes: [],
+      groups: [{ id: 'g1', name: 'g', color: null, tableIds: ['public.b'] }],
+    };
+    const positions = { 'public.a': { x: 0, y: 0 }, 'public.b': { x: 5000, y: 5000 } };
+    // b is a collapsed-group member (not explicitly hidden): the canvas does
+    // not mount table b, only GroupLayer's pill for g1 — bounds must follow.
+    const b = computeExportBounds(s, positions, {}, [], ['g1']);
+    expect(b).not.toBeNull();
+    // Must reach well past table a alone (the original bug: the collapsed
+    // group contributed nothing, so bounds stopped at table a's 220x60).
+    expect(b!.w).toBeGreaterThan(220);
+    expect(b!.h).toBeGreaterThan(60);
+    // But must NOT reach as far as table b's own full rect would (x to 5220,
+    // y to 5060) — that would mean b leaked in as an ordinary table rect
+    // instead of being replaced by the smaller (200x36) pill anchored at the
+    // group's padded top-left corner (member origin minus padding+header).
+    expect(b!.x + b!.w).toBeLessThan(5220);
+    expect(b!.y + b!.h).toBeLessThan(5060);
+  });
+
+  it('a collapsed group with every member explicitly hidden contributes nothing (matches GroupLayer rendering no pill)', () => {
+    const s: Schema = {
+      tables: [mkTable('a'), mkTable('b')], refs: [], enums: [], notes: [],
+      groups: [{ id: 'g1', name: 'g', color: null, tableIds: ['public.b'] }],
+    };
+    const positions = { 'public.a': { x: 0, y: 0 }, 'public.b': { x: 5000, y: 5000 } };
+    const b = computeExportBounds(s, positions, {}, ['public.b'], ['g1']);
+    // Only table a remains — same 220x60 rect as the single-table case above.
+    expect(b).toEqual({ x: 0, y: 0, w: 220, h: 60 });
+  });
+});
