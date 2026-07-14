@@ -80,4 +80,15 @@ describe('importSql', () => {
     expect(parsed.schema.tables[0].name).toBe('refunds');
     expect(parsed.schema.tables[0].fields.map((f) => f.name)).toEqual(['id', 'amount']);
   });
+
+  it('converts snowflake DDL to DBML that our dbmlv2 pipeline re-parses (import-only dialect)', async () => {
+    const sql = 'CREATE TABLE settlements (id NUMBER PRIMARY KEY, gross NUMBER(12,2) NOT NULL);';
+    const r = await importSql(sql, 'snowflake');
+    if (!r.ok) throw new Error(r.errors[0]?.message);
+    const parsed = parseDbml(r.text);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.schema.tables[0].name).toBe('settlements');
+    expect(parsed.schema.tables[0].fields.map((f) => f.name)).toEqual(['id', 'gross']);
+  });
 });

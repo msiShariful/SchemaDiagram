@@ -2,6 +2,13 @@ import type { ParseError } from '../parse/errors';
 import { normalizeParseErrors } from '../parse/errors';
 
 export type SqlDialect = 'postgres' | 'mysql' | 'mssql' | 'oracle';
+
+/** Import-only dialects. Snowflake is deliberately NOT in SqlDialect:
+ *  exporter.export(…, 'snowflake') returns an EMPTY STRING in the installed
+ *  8.3.1 (verified — the sqlite situation), while importer.import(…,
+ *  'snowflake') works and re-parses with 'dbmlv2'. */
+export type ImportSqlDialect = SqlDialect | 'snowflake';
+
 export type ConvertResult = { ok: true; text: string } | { ok: false; errors: ParseError[] };
 
 // @dbml/core is ~2.7 MB gzipped — it must never land in the main chunk
@@ -13,9 +20,9 @@ const loadCore = () => import('@dbml/core');
 
 /** SQL DDL → DBML text. Uses the installed 8.3.1 facade
  *  `importer.import(str, format)`, which parses with the v2 dialect parsers
- *  ('postgres' | 'mysql' | 'mssql' | 'oracle') and re-emits DBML via its own
+ *  ('postgres' | 'mysql' | 'mssql' | 'oracle' | 'snowflake') and re-emits DBML via its own
  *  exporter — so the result is always re-parseable by our 'dbmlv2' pipeline. */
-export async function importSql(sql: string, dialect: SqlDialect): Promise<ConvertResult> {
+export async function importSql(sql: string, dialect: ImportSqlDialect): Promise<ConvertResult> {
   try {
     const { importer } = await loadCore();
     return { ok: true, text: importer.import(sql, dialect) };

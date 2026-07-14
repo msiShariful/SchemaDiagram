@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { importSql, type SqlDialect } from '../core/convert/convert';
+import { importSql, type ImportSqlDialect } from '../core/convert/convert';
 import { parseProject } from '../core/convert/projectFile';
 import { importDiagram } from './usePersistence';
 import type { ParseError } from '../core/parse/parseDbml';
 import { useOverlayEscape } from './overlayStack';
 
-type ImportKind = SqlDialect | 'dbml' | 'project';
+type ImportKind = ImportSqlDialect | 'dbml' | 'project';
 
 const KIND_OPTIONS: Array<{ kind: ImportKind; label: string }> = [
   { kind: 'postgres', label: 'PostgreSQL DDL' },
   { kind: 'mysql', label: 'MySQL DDL' },
   { kind: 'mssql', label: 'SQL Server DDL' },
   { kind: 'oracle', label: 'Oracle DDL' },
+  { kind: 'snowflake', label: 'Snowflake DDL' },
   { kind: 'dbml', label: 'DBML' },
   { kind: 'project', label: 'Project file (.json)' },
 ];
