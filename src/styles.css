@@ -488,3 +488,26 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 @media (prefers-reduced-motion: reduce) {
   .edge path, .zoom-controls, .minimap { transition: none; }
 }
+
+/* Arrange chooser (dbdiagram parity) — anchors above the zoom cluster. */
+.arrange-pop {
+  position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30;
+  width: min(300px, calc(100cqw - 24px));
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); padding: 6px; text-align: left;
+}
+.arrange-title { font-weight: 600; font-size: 12px; padding: 6px 8px 8px; }
+.arrange-row {
+  display: flex; gap: 10px; width: 100%; border: none; background: none; cursor: pointer;
+  padding: 8px; border-radius: 6px; color: var(--text); text-align: left; align-items: flex-start;
+}
+.arrange-row:hover { background: var(--selection-bg); }
+.arrange-icon { flex: none; margin-top: 1px; color: var(--text-dim); }
+.arrange-row:hover .arrange-icon { color: var(--accent); }
+.arrange-text { display: flex; flex-direction: column; gap: 2px; }
+.arrange-name { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.arrange-name kbd {
+  font-family: ui-monospace, monospace; font-size: 10px; border: 1px solid var(--border);
+  border-radius: 3px; padding: 0 4px; color: var(--text-dim); background: var(--bg-panel);
+}
+.arrange-desc { font-size: 11px; color: var(--text-dim); line-height: 1.45; }

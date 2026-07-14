@@ -25,6 +25,16 @@ describe('buildElkGraph', () => {
     const g = buildElkGraph(schemaOf('Table c { id int\n parent_id int }\nRef: c.parent_id > c.id'));
     expect(g.edges).toEqual([]);
   });
+  it('maps arrange algorithms to distinct probed ELK options; default stays layered', () => {
+    const schema = schemaOf('Table a { id int }');
+    expect(buildElkGraph(schema).layoutOptions).toBe(ELK_LAYOUT_OPTIONS);
+    expect(buildElkGraph(schema, [], 'left-right').layoutOptions['elk.algorithm']).toBe('layered');
+    const snow = buildElkGraph(schema, [], 'snowflake').layoutOptions;
+    expect(snow['elk.algorithm']).toBe('stress');
+    expect(snow['elk.stress.desiredEdgeLength']).toBe('420'); // probed: default overlaps 220x150 boxes; short form avoids the leak marker
+    expect(buildElkGraph(schema, [], 'compact').layoutOptions['elk.algorithm']).toBe('rectpacking');
+  });
+
   it('produces an empty graph for an empty schema', () => {
     const g = buildElkGraph({ tables: [], refs: [], enums: [], groups: [], notes: [] });
     expect(g.children).toEqual([]);

@@ -3,12 +3,33 @@ import { TABLE_WIDTH, tableHeight } from '../model/geometry';
 
 export const ELK_ORIGIN = 60;
 
-export const ELK_LAYOUT_OPTIONS: Record<string, string> = {
-  'elk.algorithm': 'layered',
-  'elk.direction': 'RIGHT',
-  'elk.spacing.nodeNode': '60',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '90',
+/** Arrange algorithms (dbdiagram parity). Option values probed against the
+ *  installed elkjs: stress WITHOUT desiredEdgeLength overlaps 220×150 boxes
+ *  badly (21 overlaps on a 9-table star); 420 separates them cleanly with
+ *  the hub centered. rectpacking ignores edges — that's the point. */
+export type ArrangeAlgorithm = 'left-right' | 'snowflake' | 'compact';
+
+const ARRANGE_OPTIONS: Record<ArrangeAlgorithm, Record<string, string>> = {
+  'left-right': {
+    'elk.algorithm': 'layered',
+    'elk.direction': 'RIGHT',
+    'elk.spacing.nodeNode': '60',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '90',
+  },
+  snowflake: {
+    'elk.algorithm': 'stress',
+    // the 'elk.' SHORT form on purpose: the canonical 'org.eclipse.elk.*' id
+    // is check-bundle's leak marker for elkjs itself — a config string in
+    // the main chunk must not trip it (probed: both forms behave the same)
+    'elk.stress.desiredEdgeLength': '420',
+  },
+  compact: {
+    'elk.algorithm': 'rectpacking',
+    'elk.spacing.nodeNode': '40',
+  },
 };
+
+export const ELK_LAYOUT_OPTIONS: Record<string, string> = ARRANGE_OPTIONS['left-right'];
 
 export interface ElkNodeIn {
   id: string;
@@ -29,7 +50,11 @@ export interface ElkGraphIn {
   edges: ElkEdgeIn[];
 }
 
-export function buildElkGraph(schema: Schema, hiddenTableIds: readonly string[] = []): ElkGraphIn {
+export function buildElkGraph(
+  schema: Schema,
+  hiddenTableIds: readonly string[] = [],
+  algorithm: ArrangeAlgorithm = 'left-right',
+): ElkGraphIn {
   // Feature D: lay out only VISIBLE tables. Hidden ones keep their stored
   // positions because elkResultToPositions only emits laid-out children and
   // the auto-layout commit only carries returned ids.
@@ -38,7 +63,7 @@ export function buildElkGraph(schema: Schema, hiddenTableIds: readonly string[] 
   const ids = new Set(visible.map((t) => t.id));
   return {
     id: 'root',
-    layoutOptions: ELK_LAYOUT_OPTIONS,
+    layoutOptions: ARRANGE_OPTIONS[algorithm],
     children: visible.map((t) => ({
       id: t.id,
       width: TABLE_WIDTH,

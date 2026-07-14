@@ -1,7 +1,7 @@
 import type { Schema, TablePosition } from '../model/types';
 import type { ElkNode } from 'elkjs';
 import ELK from 'elkjs/lib/elk-api.js';
-import { buildElkGraph, elkResultToPositions, type ElkGraphIn } from './elkGraph';
+import { buildElkGraph, elkResultToPositions, type ElkGraphIn, type ArrangeAlgorithm } from './elkGraph';
 
 type ElkResultGraph = { children?: Array<{ id: string; x?: number; y?: number }> };
 
@@ -27,8 +27,9 @@ async function layoutInThread(graph: ElkGraphIn): Promise<Record<string, TablePo
 export function runElkLayout(
   schema: Schema,
   hiddenTableIds: readonly string[] = [],
+  algorithm: ArrangeAlgorithm = 'left-right',
 ): Promise<Record<string, TablePosition>> {
-  const graph = buildElkGraph(schema, hiddenTableIds);
+  const graph = buildElkGraph(schema, hiddenTableIds, algorithm);
   if (graph.children.length === 0) return Promise.resolve({});
 
   return new Promise((resolve, reject) => {

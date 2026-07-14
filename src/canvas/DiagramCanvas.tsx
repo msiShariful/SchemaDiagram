@@ -14,10 +14,12 @@ import { snapPosition, SNAP_TOLERANCE, DRAG_THRESHOLD_PX, type GuideLine } from 
 import { rectFromPoints, idsInRect } from './marquee';
 import { effectiveLod } from './lod';
 import { CanvasControls } from './CanvasControls';
+import { ArrangeMenu } from './ArrangeMenu';
 import { visibleWorldRect } from './culling';
 import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight, fieldRowY } from '../core/model/geometry';
 import { revealTable, appendRefLine } from '../editor/editorNav';
 import { runElkLayout } from '../core/layout/elkLayout';
+import type { ArrangeAlgorithm } from '../core/layout/elkGraph';
 import type { PositionDelta } from '../core/layout/commands';
 import type { Point, Rect, TablePosition, Viewport } from '../core/model/types';
 import { DiagramViewsSidebar } from './DiagramViewsSidebar';
@@ -98,6 +100,7 @@ export function DiagramCanvas() {
   const spaceDown = useRef(false);
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
   const [layoutBusy, setLayoutBusy] = useState(false);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
   const [settingsTableId, setSettingsTableId] = useState<string | null>(null);
   const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -705,12 +708,13 @@ export function DiagramCanvas() {
     requestAnimationFrame(tick);
   };
 
-  const autoLayout = async () => {
+  const autoLayout = async (algorithm: ArrangeAlgorithm = 'left-right') => {
+    setArrangeOpen(false);
     const { schema, hiddenTableIds, collapsedGroupIds } = useAppStore.getState();
     if (schema.tables.length === 0 || layoutBusy) return;
     setLayoutBusy(true);
     try {
-      const next = await runElkLayout(schema, [...effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds)]); // visible only; hidden/collapsed keep their positions
+      const next = await runElkLayout(schema, [...effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds)], algorithm); // visible only; hidden/collapsed keep their positions
       const st = useAppStore.getState();
       if (st.schema !== schema) {
         setLayoutBusy(false); // stale result, discard (no finally: busy now outlives the await)
@@ -847,7 +851,7 @@ export function DiagramCanvas() {
             <path d="M6 2H3a1 1 0 0 0-1 1v3M10 2h3a1 1 0 0 1 1 1v3M6 14H3a1 1 0 0 1-1-1v-3M10 14h3a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
           </svg>
         </button>
-        <button onClick={() => void autoLayout()} disabled={layoutBusy} data-tip="Auto-arrange tables (ELK layered layout)" aria-label="Auto-arrange tables">
+        <button onClick={() => setArrangeOpen((v) => !v)} disabled={layoutBusy} data-tip="Auto-arrange tables" aria-label="Auto-arrange tables">
           <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
             <rect x="1.5" y="1.5" width="5" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
             <rect x="9.5" y="4.5" width="5" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
@@ -855,6 +859,7 @@ export function DiagramCanvas() {
             <path d="M6.5 5.5l3 1M8 8.5l-1 2" stroke="currentColor" strokeWidth="1.1" fill="none" />
           </svg>
         </button>
+        {arrangeOpen && <ArrangeMenu onPick={(a) => void autoLayout(a)} onClose={() => setArrangeOpen(false)} />}
       </div>
       <CanvasControls onOpenSearch={openSearch} />
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
