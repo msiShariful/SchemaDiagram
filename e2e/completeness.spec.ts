@@ -124,7 +124,10 @@ test('group collapse: pill, hidden members/edges, persists across reload', async
   await page.goto('/');
   await setEditorText(
     page,
-    'Table users { id int }\nTable posts { user_id int [ref: > users.id] }\nTable comments { post_id int [ref: > posts.id] }\nTableGroup g1 {\n  users\n  posts\n}', // single-line multi-member TableGroup is a parse error (8.3.1 code 3017) — keep members newline-separated
+    // posts needs an id column — comments' ref targets posts.id, and the 8.3.1
+    // semantic pass rejects refs to missing columns (code 4000, found at T15
+    // execution). TableGroup members stay newline-separated (code 3017).
+    'Table users { id int }\nTable posts {\n  id int\n  user_id int [ref: > users.id]\n}\nTable comments { post_id int [ref: > posts.id] }\nTableGroup g1 {\n  users\n  posts\n}',
   );
   await expect(page.locator('.table-node')).toHaveCount(3);
   await expect(page.locator('.edge')).toHaveCount(2);
