@@ -26,6 +26,8 @@
   --note-border: #d8c96f;
   --scrim: rgba(15, 23, 42, 0.4);
   --error-border: #f3c2c2;
+  --grid-dot: #dde1e8;
+  --table-shadow: rgba(15, 23, 42, 0.14);
   --code-keyword: #8250df;
   --code-string: #0a7d4b;
   --code-number: #b25e09;
@@ -62,6 +64,8 @@
   --note-border: #6b633a;
   --scrim: rgba(0, 0, 0, 0.6);
   --error-border: #5c3a3c;
+  --grid-dot: #23272f;
+  --table-shadow: rgba(0, 0, 0, 0.45);
   --code-keyword: #c792ea;
   --code-string: #a5d6a7;
   --code-number: #f2b366;
@@ -469,4 +473,18 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 @container (max-width: 600px) {
   .zoom-controls { bottom: 52px; }
   .minimap { bottom: 92px; }
+}
+
+/* Canvas polish (dbdiagram parity): dot grid, table elevation, row hover. */
+.grid-dot { fill: var(--grid-dot); }
+.table-body, .table-box { filter: drop-shadow(0 1px 2px var(--table-shadow)); }
+.table-node.selected .table-body,
+.table-node.focused .table-body { filter: drop-shadow(0 2px 6px var(--table-shadow)); }
+/* Row under the cursor lights up at full LOD — doubles as ref-drag drop
+   feedback. Overrides the rect's fill="transparent" presentation attr. */
+.field-row:hover > rect:first-of-type { fill: var(--selection-bg); }
+.edge path { transition: stroke 0.12s ease, stroke-width 0.12s ease; }
+.zoom-controls .zoom-pct { font-size: 12px; min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .edge path, .zoom-controls, .minimap { transition: none; }
 }

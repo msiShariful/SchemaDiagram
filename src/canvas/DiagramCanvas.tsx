@@ -490,10 +490,15 @@ export function DiagramCanvas() {
     return () => registerCanvasHandle(null);
   }, []);
 
+  const gridPatternRef = useRef<SVGPatternElement | null>(null);
   const applyTransform = () => {
     const { x, y, zoom } = vpRef.current;
     zoomRef.current = zoom;
     sceneRef.current?.setAttribute('transform', `translate(${x}, ${y}) scale(${zoom})`);
+    // The grid rect is screen-sized (a world-sized rect forces the browser
+    // to rasterize a gigantic pattern layer); its pattern rides the same
+    // transform imperatively, one attribute write per tick.
+    gridPatternRef.current?.setAttribute('patternTransform', `translate(${x}, ${y}) scale(${zoom})`);
     minimapRef.current?.updateViewport(vpRef.current);
   };
 
@@ -692,6 +697,21 @@ export function DiagramCanvas() {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
+        <defs>
+          {/* Dot grid (dbdiagram-style). The rect below is SCREEN-sized and
+              sits outside the scene <g>; the pattern rides the pan/zoom
+              transform imperatively in applyTransform (patternTransform). */}
+          <pattern ref={gridPatternRef} id="canvas-dot-grid" width={24} height={24} patternUnits="userSpaceOnUse">
+            <circle cx={1} cy={1} r={1} className="grid-dot" />
+          </pattern>
+        </defs>
+        {/* pointer-events:none keeps empty-canvas clicks targeting the <svg>
+            itself — marquee/pan/clear-selection all guard on e.target === svg.
+            Hidden at box LOD (dots become noise). Outside the scene <g>, so
+            exports (which clone the scene only) never see it. */}
+        {lod !== 'box' && (
+          <rect className="canvas-grid" width="100%" height="100%" fill="url(#canvas-dot-grid)" pointerEvents="none" />
+        )}
         <g ref={sceneRef}>
           <GroupLayer zoomRef={zoomRef} onLiveMoveSet={handleGroupLiveMove} onCommitMoveSet={handleGroupCommit} />
           <EdgeLayer ref={edgeLayerRef} viewRect={viewRect} onEdgeClick={handleEdgeClick} />
@@ -745,13 +765,29 @@ export function DiagramCanvas() {
       </svg>
       <MiniMap ref={minimapRef} viewSize={size} onNavigate={handleMinimapNav} />
       <div className="zoom-controls">
-        <button onClick={() => void autoLayout()} disabled={layoutBusy} data-tip="Auto-arrange tables (ELK layered layout)">
-          auto
+        <button onClick={() => zoomBy(1 / 1.2)} data-tip="Zoom out" aria-label="Zoom out">−</button>
+        <button
+          className="zoom-pct"
+          data-tip="Reset zoom to 100%"
+          aria-label="Reset zoom to 100%"
+          onClick={() => zoomBy(1 / useAppStore.getState().viewport.zoom)}
+        >
+          {zoomPct}%
         </button>
         <button onClick={() => zoomBy(1.2)} data-tip="Zoom in" aria-label="Zoom in">+</button>
-        <button onClick={() => zoomBy(1 / 1.2)} data-tip="Zoom out" aria-label="Zoom out">−</button>
-        <button onClick={fit} data-tip="Fit diagram to view">fit</button>
-        <span>{zoomPct}%</span>
+        <button onClick={fit} data-tip="Fit diagram to view" aria-label="Fit diagram to view">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+            <path d="M6 2H3a1 1 0 0 0-1 1v3M10 2h3a1 1 0 0 1 1 1v3M6 14H3a1 1 0 0 1-1-1v-3M10 14h3a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button onClick={() => void autoLayout()} disabled={layoutBusy} data-tip="Auto-arrange tables (ELK layered layout)" aria-label="Auto-arrange tables">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="5" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            <rect x="9.5" y="4.5" width="5" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            <rect x="4.5" y="10.5" width="5" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M6.5 5.5l3 1M8 8.5l-1 2" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          </svg>
+        </button>
       </div>
       <CanvasControls onOpenSearch={openSearch} />
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
