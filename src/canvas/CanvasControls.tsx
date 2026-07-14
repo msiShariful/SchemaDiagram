@@ -9,6 +9,7 @@ const SHORTCUTS: Array<[string, string]> = [
   ['Ctrl/Cmd + Z', 'Undo canvas move'],
   ['Shift + Ctrl/Cmd + Z (or Ctrl/Cmd + Y)', 'Redo canvas move'],
   ['Ctrl/Cmd + Shift + F', 'Format DBML'],
+  ['Ctrl/Cmd + K', 'Find table'],
   ['Space + drag / middle-drag', 'Pan the canvas'],
   ['Double-click a table', 'Reveal it in the editor'],
   ['Escape', 'Clear selection'],
@@ -17,7 +18,7 @@ const SHORTCUTS: Array<[string, string]> = [
 /** Bottom-left control cluster (Feature E). snapEnabled/lodOverride are
  *  SESSION state: not persisted, untouched by diagram switches (documented
  *  plan choice — workbench preferences, not document state). */
-export function CanvasControls() {
+export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const snapEnabled = useAppStore((s) => s.snapEnabled);
   const setSnapEnabled = useAppStore((s) => s.setSnapEnabled);
@@ -42,6 +43,12 @@ export function CanvasControls() {
 
   return (
     <div className="canvas-controls" ref={rootRef}>
+      <button aria-label="Find table" title="Find table (Ctrl/Cmd+K)" onClick={onOpenSearch}>
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" />
+        </svg>
+      </button>
       <button
         aria-label="Keyboard shortcuts"
         title="Keyboard shortcuts"

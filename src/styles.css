@@ -398,3 +398,20 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 /* Plan 7 Feature C: highlight/trace dimming (visual only — selection, drag,
    and hit-testing are unaffected; hidden ≠ dimmed) */
 .table-node.dimmed, .edge.dimmed { opacity: 0.15; transition: opacity 0.15s ease; }
+
+/* Plan 7 Feature D: quick-search palette */
+.qs-backdrop { position: absolute; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.18); display: flex; justify-content: center; align-items: flex-start; }
+.qs-panel {
+  margin-top: 10vh; width: min(420px, calc(100% - 32px));
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); padding: 8px;
+}
+.qs-input {
+  width: 100%; box-sizing: border-box; font-size: 14px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);
+}
+.qs-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+.qs-item { display: flex; width: 100%; justify-content: space-between; gap: 8px; border: none; background: none; color: var(--text); padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.qs-item.active, .qs-item:hover { background: var(--selection-bg); }
+.qs-schema { color: var(--text-dim); font-size: 11px; }
+.qs-empty { color: var(--text-dim); padding: 8px 10px; font-size: 12px; }

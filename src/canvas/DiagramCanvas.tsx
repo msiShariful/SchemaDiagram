@@ -6,6 +6,7 @@ import { MiniMap, type MiniMapHandle } from './MiniMap';
 import { TableNode } from './TableNode';
 import { TableSettingsPopover } from './TableSettingsPopover';
 import { EdgeRefPopover } from './EdgeRefPopover';
+import { QuickSearch } from './QuickSearch';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -99,6 +100,9 @@ export function DiagramCanvas() {
   const [layoutBusy, setLayoutBusy] = useState(false);
   const [settingsTableId, setSettingsTableId] = useState<string | null>(null);
   const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
   // Lifted from DiagramViewsSidebar so the expanded panel can shift the
   // zoom controls + minimap out from under it via a class on .canvas-wrap.
   const [viewsOpen, setViewsOpen] = useState(false);
@@ -430,6 +434,23 @@ export function DiagramCanvas() {
     };
   }, []);
 
+  // Cmd/Ctrl+K quick-search — global, incl. while the editor is focused:
+  // CodeMirror binds Shift-Mod-k and mac Ctrl-k, never plain Mod-k (verified
+  // against the installed @codemirror/commands — plan Verified facts).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+        // Gate (decision): not while the dashboard or import dialog is up —
+        // a canvas palette opening over a full-screen modal is noise.
+        if (document.querySelector('.dialog, .dashboard')) return;
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // canvasNav registered handle (same pattern as editorNav): the Views
   // sidebar centers tables through it. Committed-viewport write → the
   // layout-effect subscription applies the transform before paint.
@@ -721,12 +742,13 @@ export function DiagramCanvas() {
         <button onClick={fit}>fit</button>
         <span>{zoomPct}%</span>
       </div>
-      <CanvasControls />
+      <CanvasControls onOpenSearch={openSearch} />
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
       {edgePopover && (
         <EdgeRefPopover refId={edgePopover.refId} x={edgePopover.x} y={edgePopover.y} onClose={closeEdgePopover} />
       )}
+      {searchOpen && <QuickSearch onClose={closeSearch} />}
     </div>
   );
 }
