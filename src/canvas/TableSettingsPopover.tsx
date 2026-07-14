@@ -61,6 +61,7 @@ export function TableSettingsPopover({ tableId, onClose }: Props) {
     else setErr('Could not rename — try editing the DBML directly.');
   };
   const applyHex = () => {
+    if (hex.trim() === '') return; // Set on an empty field is a no-op, not a validation error
     const value = (hex.startsWith('#') ? hex : `#${hex}`).toLowerCase();
     if (!HEX_COLOR_RE.test(value)) {
       setErr('Hex color must be #RRGGBB.');

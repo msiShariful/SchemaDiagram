@@ -2,7 +2,7 @@ import { memo, useRef } from 'react';
 import type { Table, TablePosition } from '../core/model/types';
 import { TABLE_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, tableHeight } from '../core/model/geometry';
 import { type LodLevel } from './lod';
-import { fieldBadges, fieldTooltip } from './fieldMeta';
+import { fieldBadges, fieldTooltip, fitFieldRow, fitTableTitle } from './fieldMeta';
 
 interface Props {
   table: Table;
@@ -74,16 +74,32 @@ export const TableNode = memo(function TableNode({
         <>
           <rect width={TABLE_WIDTH} height={h} rx={6} className="table-body" />
           <g className="table-header-g">
-            {table.note !== null && <title>{table.note}</title>}
-            <rect width={TABLE_WIDTH} height={HEADER_HEIGHT} rx={6} className="table-header" fill={table.headerColor ?? undefined} />
-            <text x={10} y={HEADER_HEIGHT / 2} dominantBaseline="central" className="table-title">
-              {table.name}
-            </text>
+            {(() => {
+              const fitTitle = fitTableTitle(table.name);
+              const tip =
+                fitTitle !== table.name
+                  ? table.note !== null
+                    ? `${table.name}\n${table.note}`
+                    : table.name
+                  : table.note;
+              return (
+                <>
+                  {tip !== null && <title>{tip}</title>}
+                  <rect width={TABLE_WIDTH} height={HEADER_HEIGHT} rx={6} className="table-header" fill={table.headerColor ?? undefined} />
+                  <text x={10} y={HEADER_HEIGHT / 2} dominantBaseline="central" className="table-title">
+                    {fitTitle}
+                  </text>
+                </>
+              );
+            })()}
           </g>
           {lod === 'full' &&
             table.fields.map((f, i) => {
               const badges = fieldBadges(f);
-              const tip = fieldTooltip(f);
+              const fit = fitFieldRow(f.name, f.type, badges, f.pk, f.note !== null);
+              const meta = fieldTooltip(f);
+              // A truncated name is recovered through the tooltip.
+              const tip = fit.nameTruncated ? (meta !== null ? `${f.name}\n${meta}` : f.name) : meta;
               return (
                 <g key={f.name} className="field-row" transform={`translate(0, ${HEADER_HEIGHT + i * ROW_HEIGHT})`}>
                   {tip !== null && <title>{tip}</title>}
@@ -93,12 +109,12 @@ export const TableNode = memo(function TableNode({
                   <rect width={TABLE_WIDTH} height={ROW_HEIGHT} fill="transparent" />
                   <line x1={0} y1={0} x2={TABLE_WIDTH} y2={0} className="row-line" />
                   <text x={10} y={ROW_HEIGHT / 2} dominantBaseline="central" className={`field-name${f.pk ? ' pk' : ''}`}>
-                    {f.pk ? '🔑 ' : ''}{f.name}
+                    {f.pk ? '🔑 ' : ''}{fit.name}
                     {f.note !== null && <tspan className="field-note-dot"> ●</tspan>}
                   </text>
                   <text x={TABLE_WIDTH - 10} y={ROW_HEIGHT / 2} dominantBaseline="central" textAnchor="end" className="field-type">
                     {badges !== '' && <tspan className="field-badges">{badges} </tspan>}
-                    {f.type}
+                    {fit.type}
                   </text>
                   <circle
                     className="ref-handle"
