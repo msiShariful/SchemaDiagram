@@ -1920,10 +1920,12 @@ interface EdgeLayerProps {
 
 ```css
 /* Plan 7 Feature A: widened edge hit target + popover.
-   Selector must be .edge .edge-hit (0-2-0): the pre-existing `.edge path`
-   rule is 0-1-1 and would otherwise win, rendering the hit target 1.5px
-   colored instead of 12px transparent. (Task-8 review fix.) */
-.edge .edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+   Selector must be .edge path.edge-hit (0-2-1): it beats `.edge path`
+   (0-1-1) outright and TIES `.edge.hot path` (0-2-1), winning on source
+   order (appended later in the file) — otherwise a hovered/selected edge
+   (g.edge.hot) would collapse the hit target to a 2.5px colored stroke.
+   (Task-8 review fix, two rounds.) */
+.edge path.edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 ```
 
 - [ ] **Step 2: The popover component**
