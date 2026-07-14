@@ -360,7 +360,9 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   color: var(--text); border-radius: 4px; display: flex; align-items: center;
 }
 .canvas-controls > button.active { background: var(--selection-bg); color: var(--accent); }
-.canvas-controls > button:disabled { opacity: 0.4; cursor: default; }
+/* Dim via color, not opacity: element opacity would also wash out the
+   [data-tip] tooltip pseudo-element. Icons stroke with currentColor. */
+.canvas-controls > button:disabled { color: var(--border); cursor: default; }
 .lod-select { display: flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .lod-select select {
   font-size: 12px; padding: 2px 4px; border: 1px solid var(--border);
@@ -429,3 +431,42 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .qs-item.active, .qs-item:hover { background: var(--selection-bg); }
 .qs-schema { color: var(--text-dim); font-size: 11px; }
 .qs-empty { color: var(--text-dim); padding: 8px 10px; font-size: 12px; }
+
+/* Hand tool (pan mode): grab cursor everywhere on the canvas — in pan mode
+   every left-drag pans, so per-element cursors (table grab, ref crosshair)
+   are suppressed. */
+.canvas-wrap.pan-mode > svg,
+.canvas-wrap.pan-mode > svg * { cursor: grab; }
+
+/* dbdiagram-style hover tips for the bottom clusters: an instant dark box
+   above the icon (native title is slow and single-line). \n in data-tip
+   becomes a line break via pre-line. Left cluster grows rightward; the
+   right-anchored zoom cluster grows leftward so tips never leave the pane. */
+/* Buttons stay non-positioned ON PURPOSE: the ::after then resolves against
+   the positioned CLUSTER, so every icon's tip sits above the cluster,
+   aligned to its edge (dbdiagram behavior) — a tip anchored to a deep
+   button would clip at the pane edge. */
+.canvas-controls [data-tip]::after,
+.zoom-controls [data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 0;
+  width: max-content; max-width: min(260px, calc(100cqw - 40px));
+  background: #17191f; color: #f5f6f8;
+  border-radius: 6px; padding: 7px 10px;
+  font-size: 12px; font-weight: 400; line-height: 1.5; text-align: left;
+  white-space: pre-line; pointer-events: none;
+  opacity: 0; visibility: hidden; z-index: 40;
+  transition: opacity 0.1s ease 0.12s, visibility 0s linear 0.12s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+.canvas-controls [data-tip]:hover::after,
+.zoom-controls [data-tip]:hover::after { opacity: 1; visibility: visible; }
+.zoom-controls [data-tip]::after { left: auto; right: 0; }
+
+/* Narrow pane: the two bottom clusters collide side-by-side below ~600px —
+   hop the zoom cluster (and the minimap riding above it) up a row.
+   .canvas-pane is already an inline-size container (shortcuts-pop fix). */
+@container (max-width: 600px) {
+  .zoom-controls { bottom: 52px; }
+  .minimap { bottom: 92px; }
+}

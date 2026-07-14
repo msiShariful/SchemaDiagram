@@ -106,6 +106,8 @@ export function DiagramCanvas() {
   // Lifted from DiagramViewsSidebar so the expanded panel can shift the
   // zoom controls + minimap out from under it via a class on .canvas-wrap.
   const [viewsOpen, setViewsOpen] = useState(false);
+  // Hand tool: primitive subscription — re-renders only on toggle (cursor class).
+  const panMode = useAppStore((s) => s.panMode);
 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
@@ -547,7 +549,10 @@ export function DiagramCanvas() {
   // button press can neither hijack nor double-start a gesture.
   const onPointerDownCapture = (e: React.PointerEvent<SVGSVGElement>) => {
     if (panRef.current || marqueeState.current || refDragRef.current) return; // a gesture already owns the canvas
-    const wantPan = e.button === 1 || (e.button === 0 && spaceDown.current);
+    // Hand tool (panMode): plain left-drag pans from ANYWHERE, tables
+    // included — read at gesture start only, never per tick.
+    const wantPan =
+      e.button === 1 || (e.button === 0 && (spaceDown.current || useAppStore.getState().panMode));
     if (!wantPan) return;
     e.preventDefault(); // best effort against middle-click autoscroll
     e.stopPropagation(); // don't let TableNode/NoteNode/GroupLayer start a drag
@@ -677,7 +682,7 @@ export function DiagramCanvas() {
   };
 
   return (
-    <div className={`canvas-wrap${viewsOpen ? ' views-open' : ''}`}>
+    <div className={`canvas-wrap${viewsOpen ? ' views-open' : ''}${panMode ? ' pan-mode' : ''}`}>
       <svg
         ref={svgRef}
         className="diagram-canvas"
@@ -740,12 +745,12 @@ export function DiagramCanvas() {
       </svg>
       <MiniMap ref={minimapRef} viewSize={size} onNavigate={handleMinimapNav} />
       <div className="zoom-controls">
-        <button onClick={() => void autoLayout()} disabled={layoutBusy} title="Auto-layout (ELK layered)">
+        <button onClick={() => void autoLayout()} disabled={layoutBusy} data-tip="Auto-arrange tables (ELK layered layout)">
           auto
         </button>
-        <button onClick={() => zoomBy(1.2)}>+</button>
-        <button onClick={() => zoomBy(1 / 1.2)}>−</button>
-        <button onClick={fit}>fit</button>
+        <button onClick={() => zoomBy(1.2)} data-tip="Zoom in" aria-label="Zoom in">+</button>
+        <button onClick={() => zoomBy(1 / 1.2)} data-tip="Zoom out" aria-label="Zoom out">−</button>
+        <button onClick={fit} data-tip="Fit diagram to view">fit</button>
         <span>{zoomPct}%</span>
       </div>
       <CanvasControls onOpenSearch={openSearch} />

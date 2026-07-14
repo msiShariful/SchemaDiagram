@@ -26,6 +26,8 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
   const setLodOverride = useAppStore((s) => s.setLodOverride);
   const traceEnabled = useAppStore((s) => s.traceEnabled);
   const setTraceEnabled = useAppStore((s) => s.setTraceEnabled);
+  const panMode = useAppStore((s) => s.panMode);
+  const setPanMode = useAppStore((s) => s.setPanMode);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Toolbar undo/redo (Feature F). The stack is module-level (not store
@@ -51,7 +53,7 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
 
   return (
     <div className="canvas-controls" ref={rootRef}>
-      <button aria-label="Find table" title="Find table (Ctrl/Cmd+K)" onClick={onOpenSearch}>
+      <button aria-label="Find table" data-tip="Find table (Ctrl/Cmd + K)" onClick={onOpenSearch}>
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
           <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
           <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" />
@@ -59,7 +61,7 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
       </button>
       <button
         aria-label="Keyboard shortcuts"
-        title="Keyboard shortcuts"
+        data-tip="Keyboard shortcuts"
         onClick={() => setShortcutsOpen((v) => !v)}
       >
         ?
@@ -68,7 +70,7 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
         aria-pressed={snapEnabled}
         className={snapEnabled ? 'active' : ''}
         aria-label="Toggle snap"
-        title={snapEnabled ? 'Snap to grid/guides: on' : 'Snap to grid/guides: off'}
+        data-tip={snapEnabled ? 'Snap to grid/guides: on' : 'Snap to grid/guides: off'}
         onClick={() => setSnapEnabled(!snapEnabled)}
       >
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
@@ -79,7 +81,9 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
         aria-pressed={traceEnabled}
         className={traceEnabled ? 'active' : ''}
         aria-label="Toggle highlight mode"
-        title={traceEnabled ? 'Highlight mode: on — click a table to trace its refs' : 'Highlight mode: off'}
+        data-tip={traceEnabled
+          ? 'Highlight mode: on — click a table\nto trace its refs'
+          : 'Click to enable highlight mode'}
         onClick={() => setTraceEnabled(!traceEnabled)}
       >
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
@@ -88,8 +92,28 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
         </svg>
       </button>
       <button
+        aria-pressed={panMode}
+        className={panMode ? 'active' : ''}
+        aria-label="Toggle pan mode"
+        data-tip={panMode
+          ? 'Pan mode: on — drag anywhere to pan'
+          : 'Click to enable pan mode\nOr hold Space/Middle mouse + drag to pan'}
+        onClick={() => setPanMode(!panMode)}
+      >
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path
+            d="M5.2 8V3.6a.9.9 0 0 1 1.8 0V7M7 7V2.4a.9.9 0 0 1 1.8 0V7m0 .2V3.1a.9.9 0 0 1 1.8 0v4.6m0 .1V5.4a.9.9 0 0 1 1.8 0v4.1c0 2.9-1.9 5-4.6 5-2.2 0-3.3-1.1-4-2.7L2.7 9.3a.95.95 0 0 1 1.6-1l.9 1.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      <button
         aria-label="Undo canvas move"
-        title="Undo canvas move (Ctrl/Cmd+Z)"
+        data-tip={'Undo canvas move\nCtrl/Cmd + Z'}
         disabled={!stack.canUndo()}
         onClick={() => useAppStore.getState().undoCanvas()}
       >
@@ -99,7 +123,7 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
       </button>
       <button
         aria-label="Redo canvas move"
-        title="Redo canvas move (Shift+Ctrl/Cmd+Z)"
+        data-tip={'Redo canvas move\nShift + Ctrl/Cmd + Z'}
         disabled={!stack.canRedo()}
         onClick={() => useAppStore.getState().redoCanvas()}
       >

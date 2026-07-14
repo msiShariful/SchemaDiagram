@@ -382,14 +382,16 @@ describe('view state (Plan 6): hiddenTableIds, session flags, createdAt', () => 
     expect(useAppStore.getState().diagramCreatedAt).toBeNull();
   });
 
-  it('loadDiagram does NOT touch snapEnabled/lodOverride (session state)', () => {
+  it('loadDiagram does NOT touch snapEnabled/lodOverride/panMode (session state)', () => {
     useAppStore.getState().setSnapEnabled(false);
     useAppStore.getState().setLodOverride('boxes');
+    useAppStore.getState().setPanMode(true);
     useAppStore.getState().loadDiagram({
       id: 'z', name: 'Z', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
     });
     expect(useAppStore.getState().snapEnabled).toBe(false);
     expect(useAppStore.getState().lodOverride).toBe('boxes');
+    expect(useAppStore.getState().panMode).toBe(true);
   });
 });
 

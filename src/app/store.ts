@@ -81,6 +81,7 @@ interface AppState {
   hiddenTableIds: string[]; // view state: tables hidden from the canvas (Feature D) — layout-side, never DBML
   diagramCreatedAt: number | null; // mirrors PersistedDiagram.createdAt so autosave round-trips it
   snapEnabled: boolean; // session-only (not persisted): drag snap on/off (Feature E)
+  panMode: boolean; // session-only: hand tool — left-drag anywhere pans (Space/middle still work when off)
   lodOverride: LodOverride; // session-only (not persisted): detail dropdown (Feature E)
   traceEnabled: boolean; // session-only: highlight/trace mode toggle (Feature C)
   highlightTableId: string | null; // session-only: the traced table; cleared on diagram switch, pruned on parse
@@ -96,6 +97,7 @@ interface AppState {
   setSelectedTables(ids: string[]): void;
   setHiddenTables(ids: string[]): void;
   setSnapEnabled(v: boolean): void;
+  setPanMode(v: boolean): void;
   setLodOverride(v: LodOverride): void;
   setTraceEnabled(v: boolean): void;
   setHighlightTable(id: string | null): void;
@@ -125,6 +127,7 @@ export const useAppStore = create<AppState>()(
     hiddenTableIds: [],
     diagramCreatedAt: null,
     snapEnabled: true,
+    panMode: false,
     lodOverride: 'auto',
     traceEnabled: false,
     highlightTableId: null,
@@ -212,6 +215,7 @@ export const useAppStore = create<AppState>()(
         };
       }),
     setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
+    setPanMode: (panMode) => set({ panMode }),
     setLodOverride: (lodOverride) => set({ lodOverride }),
     setTraceEnabled: (traceEnabled) =>
       set((s) => ({ traceEnabled, highlightTableId: traceEnabled ? s.highlightTableId : null })),
@@ -253,7 +257,7 @@ export const useAppStore = create<AppState>()(
         collapsedGroupIds: rec.collapsedGroupIds ?? [], // pre-Plan-7 records: nothing collapsed
         highlightTableId: null, // it named a table of the OLD diagram
         canvasStackVersion: s.canvasStackVersion + 1, // resetCanvasStack() above emptied the stack — buttons must re-read
-        // traceEnabled / snapEnabled / lodOverride deliberately untouched: session state.
+        // traceEnabled / snapEnabled / panMode / lodOverride deliberately untouched: session state.
       }));
     },
   })),
