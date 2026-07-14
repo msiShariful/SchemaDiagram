@@ -1,6 +1,7 @@
 import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../app/store';
 import { getTableRect } from '../core/model/geometry';
+import { effectiveHiddenIds } from '../core/model/visibility';
 import {
   MINIMAP_H, MINIMAP_W, boundsOfRects, miniToWorld, minimapTransform, worldToMini,
   type MiniTransform,
@@ -20,16 +21,17 @@ export const MiniMap = memo(forwardRef<MiniMapHandle, Props>(function MiniMap({ 
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
   const viewRectEl = useRef<SVGRectElement>(null);
   const dragging = useRef(false);
   const lastScrub = useRef<Point | null>(null); // last world center navTo computed (see pointercancel)
 
   const items = useMemo(() => {
-    const hidden = new Set(hiddenTableIds);
+    const hidden = new Set(effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds));
     return schema.tables
       .filter((t) => positions[t.id] && !hidden.has(t.id))
       .map((t) => ({ id: t.id, rect: getTableRect(t, positions[t.id]), color: t.headerColor }));
-  }, [schema, positions, hiddenTableIds]);
+  }, [schema, positions, hiddenTableIds, collapsedGroupIds]);
   const bounds = useMemo(() => boundsOfRects(items.map((i) => i.rect)), [items]);
   const t: MiniTransform | null = bounds ? minimapTransform(bounds) : null;
 

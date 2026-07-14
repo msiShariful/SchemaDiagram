@@ -3,6 +3,7 @@ import { useAppStore } from '../app/store';
 import { buildEdgeSpecs, type EdgeSpec } from '../core/layout/edges';
 import { routeEdge, pointsToPath } from '../core/layout/routing';
 import { getTableRect, fieldRowY, rectsOverlap } from '../core/model/geometry';
+import { effectiveHiddenIds } from '../core/model/visibility';
 import type { Rect, Table, TablePosition } from '../core/model/types';
 
 export interface EdgeLayerHandle {
@@ -47,18 +48,21 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
   const pathRefs = useRef(new Map<string, SVGPathElement>());
   const hitRefs = useRef(new Map<string, SVGPathElement>());
 
   // Feature D: filtering HERE means render, specsByTable, and the imperative
   // updateTablePositions path all inherit it — an edge with a hidden endpoint
-  // simply doesn't exist, and no per-tick code changes.
+  // simply doesn't exist, and no per-tick code changes. Feature E: hidden
+  // is the EFFECTIVE set (explicit ∪ collapsed-group members) — edges to a
+  // collapsed member disappear (accepted divergence, see plan header).
   const specs = useMemo(() => {
-    const hidden = new Set(hiddenTableIds);
+    const hidden = new Set(effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds));
     return buildEdgeSpecs(schema).filter(
       (sp) => !hidden.has(sp.fromTableId) && !hidden.has(sp.toTableId),
     );
-  }, [schema, hiddenTableIds]);
+  }, [schema, hiddenTableIds, collapsedGroupIds]);
   const tablesById = useMemo(() => new Map(schema.tables.map((t) => [t.id, t])), [schema]);
   const specsByTable = useMemo(() => {
     const m = new Map<string, EdgeSpec[]>();

@@ -1,8 +1,11 @@
 import { memo, useMemo, useRef } from 'react';
 import { useAppStore } from '../app/store';
 import { computeGroupRect, GROUP_HEADER_HEIGHT } from '../core/layout/groups';
-import { omitHidden } from '../core/model/visibility';
+import { effectiveHiddenIds, omitHidden } from '../core/model/visibility';
 import type { TablePosition } from '../core/model/types';
+
+const GROUP_PILL_W = 200;
+const GROUP_PILL_H = 36;
 
 interface Props {
   zoomRef: React.RefObject<number>;
@@ -29,8 +32,25 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
   // stored positions (startDrag reads unfiltered store positions) —
   // deliberate: group integrity survives hide/unhide. This is the intentional
   // exception to hiding-deselects: membership, not selection, drives it.
-  const visPositions = useMemo(() => omitHidden(positions, hiddenTableIds), [positions, hiddenTableIds]);
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
+  const collapsedSet = useMemo(() => new Set(collapsedGroupIds), [collapsedGroupIds]);
+  // Expanded rects hug members visible on the CANVAS (explicit hides ∪ other
+  // groups' collapses); pill rects use EXPLICIT hides only — a collapsed
+  // group's own members must not null its rect (positions persist).
+  const effectiveHidden = useMemo(
+    () => effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds),
+    [schema, hiddenTableIds, collapsedGroupIds],
+  );
+  const visPositions = useMemo(() => omitHidden(positions, effectiveHidden), [positions, effectiveHidden]);
+  const pillPositions = useMemo(() => omitHidden(positions, hiddenTableIds), [positions, hiddenTableIds]);
   const drag = useRef<GroupDrag | null>(null);
+
+  const toggleCollapse = (groupId: string) => {
+    const cur = useAppStore.getState().collapsedGroupIds;
+    useAppStore.getState().setCollapsedGroups(
+      cur.includes(groupId) ? cur.filter((id) => id !== groupId) : [...cur, groupId],
+    );
+  };
 
   const startDrag = (memberIds: string[]) => (e: React.PointerEvent<SVGGElement>) => {
     if (e.button !== 0) return;
@@ -77,9 +97,37 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
   return (
     <g className="group-layer">
       {schema.groups.map((g) => {
-        const rect = computeGroupRect(g, schema, visPositions);
+        const collapsed = collapsedSet.has(g.id);
+        const rect = computeGroupRect(g, schema, collapsed ? pillPositions : visPositions);
         if (!rect) return null;
         const color = g.color ?? 'var(--table-header)';
+        if (collapsed) {
+          return (
+            <g key={g.id} className="table-group collapsed">
+              <g
+                className="group-header"
+                onPointerDown={startDrag(g.tableIds)}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                onLostPointerCapture={onPointerUp}
+              >
+                <rect className="group-pill" x={rect.x} y={rect.y} width={GROUP_PILL_W} height={GROUP_PILL_H} rx={8} stroke={color} fill={color} />
+                <text x={rect.x + 30} y={rect.y + GROUP_PILL_H / 2} dominantBaseline="central" className="group-title">
+                  {g.name} ({g.tableIds.length})
+                </text>
+              </g>
+              <g
+                className="group-collapse"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => toggleCollapse(g.id)}
+              >
+                <rect x={rect.x + 6} y={rect.y + GROUP_PILL_H / 2 - 8} width={16} height={16} rx={3} className="group-collapse-bg" />
+                <text x={rect.x + 14} y={rect.y + GROUP_PILL_H / 2} textAnchor="middle" dominantBaseline="central" className="group-collapse-glyph">▸</text>
+              </g>
+            </g>
+          );
+        }
         return (
           <g key={g.id} className="table-group">
             <rect className="group-rect" x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx={8} stroke={color} fill={color} />
@@ -96,6 +144,14 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
               <text x={rect.x + 24} y={rect.y + GROUP_HEADER_HEIGHT / 2} dominantBaseline="central" className="group-title">
                 {g.name}
               </text>
+            </g>
+            <g
+              className="group-collapse"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => toggleCollapse(g.id)}
+            >
+              <rect x={rect.x + rect.w - 22} y={rect.y + GROUP_HEADER_HEIGHT / 2 - 8} width={16} height={16} rx={3} className="group-collapse-bg" />
+              <text x={rect.x + rect.w - 14} y={rect.y + GROUP_HEADER_HEIGHT / 2} textAnchor="middle" dominantBaseline="central" className="group-collapse-glyph">▾</text>
             </g>
           </g>
         );

@@ -35,6 +35,20 @@ export function DiagramViewsSidebar({ expanded, setExpanded }: Props) {
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
   const setHiddenTables = useAppStore((s) => s.setHiddenTables);
   const hidden = useMemo(() => new Set(hiddenTableIds), [hiddenTableIds]);
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
+  const schemaGroups = useAppStore((s) => s.schema.groups);
+  // tableId → collapsed group name (first wins) — rows hidden BY COLLAPSE
+  // show a disabled eye: the eye edits hiddenTableIds, and flipping that
+  // would do nothing visible while the group stays collapsed.
+  const collapsedBy = useMemo(() => {
+    const collapsed = new Set(collapsedGroupIds);
+    const m = new Map<string, string>();
+    for (const g of schemaGroups) {
+      if (!collapsed.has(g.id)) continue;
+      for (const id of g.tableIds) if (!m.has(id)) m.set(id, g.name);
+    }
+    return m;
+  }, [collapsedGroupIds, schemaGroups]);
 
   const groups = useMemo(() => {
     const m = new Map<string, Table[]>();
@@ -48,11 +62,20 @@ export function DiagramViewsSidebar({ expanded, setExpanded }: Props) {
       hidden.has(id) ? hiddenTableIds.filter((h) => h !== id) : [...hiddenTableIds, id],
     );
   };
-  // Clicking a HIDDEN table's name centers on a table with no mounted node
-  // (flash targets nothing). Unhide first — "show me this table" is the
-  // intent — then center; the eye stays the pure visibility control.
+  // Clicking a HIDDEN (or collapsed-away) table's name centers on a table
+  // with no mounted node (flash targets nothing). Unhide/expand first —
+  // "show me this table" is the intent — then center; the eye stays the
+  // pure visibility control. Mirrors QuickSearch's choose() (Task 10).
   const centerOn = (id: string) => {
     if (hidden.has(id)) setHiddenTables(hiddenTableIds.filter((h) => h !== id));
+    if (collapsedBy.has(id)) {
+      const s = useAppStore.getState();
+      s.setCollapsedGroups(
+        s.collapsedGroupIds.filter(
+          (gid) => !s.schema.groups.some((g) => g.id === gid && g.tableIds.includes(id)),
+        ),
+      );
+    }
     centerOnTable(id);
   };
   const toggleSchema = (members: Table[]) => {
@@ -90,7 +113,7 @@ export function DiagramViewsSidebar({ expanded, setExpanded }: Props) {
         {groups.map(([schemaName, members]) => {
           const listed = q ? members.filter((t) => t.name.toLowerCase().includes(q)) : members;
           if (q && listed.length === 0) return null;
-          const visibleCount = members.filter((t) => !hidden.has(t.id)).length;
+          const visibleCount = members.filter((t) => !hidden.has(t.id) && !collapsedBy.has(t.id)).length;
           return (
             <div key={schemaName}>
               <div className="views-schema">
@@ -110,9 +133,20 @@ export function DiagramViewsSidebar({ expanded, setExpanded }: Props) {
                   <button className="views-name" title="Center on this table" onClick={() => centerOn(t.id)}>
                     {t.name}
                   </button>
-                  <button className="views-eye" aria-label="Toggle visibility" onClick={() => toggleTable(t.id)}>
-                    <EyeIcon off={hidden.has(t.id)} />
-                  </button>
+                  {collapsedBy.has(t.id) ? (
+                    <button
+                      className="views-eye"
+                      aria-label="Toggle visibility"
+                      disabled
+                      title={`Hidden by collapsed group "${collapsedBy.get(t.id)}" — expand it on the canvas`}
+                    >
+                      <EyeIcon off />
+                    </button>
+                  ) : (
+                    <button className="views-eye" aria-label="Toggle visibility" onClick={() => toggleTable(t.id)}>
+                      <EyeIcon off={hidden.has(t.id)} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -115,10 +115,16 @@ export function DiagramCanvas() {
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
-  // Committed-state filter (perf contract): consulted only inside render
-  // maps; the imperative pan/drag paths never see it because hidden
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
+  // Committed-state filter (perf contract): the EFFECTIVE hidden set
+  // (explicit ∪ collapsed-group members), derived here once per committed
+  // render — the imperative pan/drag paths never see it because hidden
   // tables/edges are simply not mounted.
-  const hiddenSet = useMemo(() => new Set(hiddenTableIds), [hiddenTableIds]);
+  const effectiveHidden = useMemo(
+    () => effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds),
+    [schema, hiddenTableIds, collapsedGroupIds],
+  );
+  const hiddenSet = useMemo(() => new Set(effectiveHidden), [effectiveHidden]);
   const traceEnabled = useAppStore((s) => s.traceEnabled);
   const highlightTableId = useAppStore((s) => s.highlightTableId);
   // Feature C: the KEEP set (highlight + 1-hop neighbors), render-time memo
@@ -270,7 +276,7 @@ export function DiagramCanvas() {
         base,
         live: { ...base },
         // Snap candidates exclude hidden tables — no ghost alignment guides.
-        otherRects: visibleTableRects(s.schema, s.positions, s.hiddenTableIds)
+        otherRects: visibleTableRects(s.schema, s.positions, effectiveHiddenIds(s.schema, s.hiddenTableIds, s.collapsedGroupIds))
           .filter((x) => !memberSet.has(x.id))
           .map((x) => x.rect),
         size: { w: TABLE_WIDTH, h: tableHeight(table?.fields.length ?? 0) },
@@ -618,7 +624,7 @@ export function DiagramCanvas() {
       if (store.highlightTableId !== null) store.setHighlightTable(null);
       return;
     }
-    const items = visibleTableRects(store.schema, store.positions, store.hiddenTableIds); // can't select hidden
+    const items = visibleTableRects(store.schema, store.positions, effectiveHiddenIds(store.schema, store.hiddenTableIds, store.collapsedGroupIds)); // can't select hidden
     store.setSelectedTables(idsInRect(items, sel));
   };
 
@@ -641,18 +647,18 @@ export function DiagramCanvas() {
     useAppStore.getState().setViewport(vpRef.current);
   };
   const fit = () => {
-    const { schema, positions, hiddenTableIds: hid } = useAppStore.getState();
-    const rects = visibleTableRects(schema, positions, hid).map((x) => x.rect);
+    const { schema, positions, hiddenTableIds, collapsedGroupIds } = useAppStore.getState();
+    const rects = visibleTableRects(schema, positions, effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds)).map((x) => x.rect);
     const rect = svgRef.current!.getBoundingClientRect();
     useAppStore.getState().setViewport(fitViewport(rects, rect.width, rect.height));
   };
 
   const autoLayout = async () => {
-    const { schema, hiddenTableIds: hid } = useAppStore.getState();
+    const { schema, hiddenTableIds, collapsedGroupIds } = useAppStore.getState();
     if (schema.tables.length === 0 || layoutBusy) return;
     setLayoutBusy(true);
     try {
-      const next = await runElkLayout(schema, hid); // visible only; hidden keep their positions
+      const next = await runElkLayout(schema, [...effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds)]); // visible only; hidden/collapsed keep their positions
       const st = useAppStore.getState();
       if (st.schema !== schema) return; // schema changed mid-layout: stale result, discard
       const tables = Object.keys(next).map((id) => ({

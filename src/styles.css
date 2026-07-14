@@ -146,6 +146,11 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .group-rect { fill-opacity: 0.05; stroke-width: 1.5; stroke-dasharray: 6 4; }
 .group-header { cursor: grab; }
 .group-title { font-size: 12px; font-weight: 600; fill: var(--text); }
+/* Plan 7 Feature E: collapsed-group pill + chevrons */
+.group-pill { fill-opacity: 0.22; stroke-width: 1.5; cursor: grab; }
+.group-collapse { cursor: pointer; }
+.group-collapse-bg { fill: var(--bg-elev); stroke: var(--border); }
+.group-collapse-glyph { font-size: 10px; fill: var(--text); user-select: none; }
 .sticky-note { cursor: grab; }
 .note-body { fill: var(--note-bg); stroke: var(--note-border); }
 .note-title { font-size: 11px; font-weight: 600; fill: var(--text); }
@@ -332,6 +337,7 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   cursor: pointer; padding: 3px 0; font-size: 12px;
 }
 .views-eye { border: none; background: none; color: var(--text); cursor: pointer; padding: 2px; display: flex; }
+.views-eye:disabled { opacity: 0.5; cursor: not-allowed; }
 .views-footer { border-top: 1px solid var(--border); padding: 8px 12px; }
 .views-all {
   width: 100%; font-size: 12px; padding: 5px 0; border: 1px solid var(--border);

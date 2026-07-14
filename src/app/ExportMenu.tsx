@@ -5,6 +5,7 @@ import { serializeProject } from '../core/convert/projectFile';
 import { downloadBlob, downloadText } from './export/download';
 import { safeFilename } from './export/exportCss';
 import { buildDiagramSvg, buildPngBlob } from './export/svgExport';
+import { effectiveHiddenIds } from '../core/model/visibility';
 
 const SQL_DIALECTS: Array<{ dialect: SqlDialect; label: string }> = [
   { dialect: 'postgres', label: 'PostgreSQL' },
@@ -17,8 +18,11 @@ export function ExportMenu() {
   const menu = useHoverMenu();
   const stale = useAppStore((s) => s.stale);
   const errors = useAppStore((s) => s.errors);
+  const schema = useAppStore((s) => s.schema);
   const tableCount = useAppStore((s) => s.schema.tables.length);
-  const hiddenCount = useAppStore((s) => s.hiddenTableIds.length);
+  const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
+  const hiddenCount = effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds).length;
   const sqlDisabled = stale || errors.length > 0;
   // Gate on VISIBLE tables, not total: with every table hidden, SVG would
   // silently no-op and PNG would alert a misleading "canvas too small" error.

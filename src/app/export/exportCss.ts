@@ -29,6 +29,10 @@ export const EXPORT_CSS = [
   // Plan 7 Feature B: field badges + note dots.
   '.field-badges { font-size: 8px; fill: var(--text-dim); letter-spacing: 0.03em; }',
   '.field-note-dot { font-size: 7px; fill: var(--accent); }',
+  // Plan 7 Feature E: collapsed-group pill + chevrons.
+  '.group-pill { fill-opacity: 0.22; stroke-width: 1.5; }',
+  '.group-collapse-bg { fill: var(--bg-elev); stroke: var(--border); }',
+  '.group-collapse-glyph { font-size: 10px; fill: var(--text); }',
 ].join('\n');
 
 /** Replace every `var(--name)` / `var(--name, fallback)` with a concrete
