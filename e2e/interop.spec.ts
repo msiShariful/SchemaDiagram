@@ -23,6 +23,11 @@ const DIALECTS = [
     sql: 'CREATE TABLE refunds (id NUMBER PRIMARY KEY, amount NUMBER(10,2) NOT NULL);',
     table: 'refunds',
   },
+  {
+    kind: 'snowflake',
+    sql: 'CREATE TABLE settlements (id NUMBER PRIMARY KEY, gross NUMBER(12,2) NOT NULL);',
+    table: 'settlements',
+  },
 ] as const;
 
 test('SQL import per dialect creates a NEW diagram each time, never overwriting (spec §10)', async ({ page }) => {
