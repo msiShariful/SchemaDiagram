@@ -271,6 +271,7 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   font-size: 13px; padding: 8px 10px; border: 1px solid var(--accent);
   background: var(--accent); color: #fff; border-radius: 6px; cursor: pointer;
 }
+.dash-sample { width: 100%; margin-top: 8px; font-size: 12px; padding: 7px 0; border: 1px solid var(--border); background: none; color: var(--text); border-radius: 6px; cursor: pointer; }
 .dash-rail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
 .dash-main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow-y: auto; min-width: 0; }
 .dash-topbar { display: flex; gap: 8px; }
@@ -355,13 +356,14 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   color: var(--text); border-radius: 4px; display: flex; align-items: center;
 }
 .canvas-controls > button.active { background: var(--selection-bg); color: var(--accent); }
+.canvas-controls > button:disabled { opacity: 0.4; cursor: default; }
 .lod-select { display: flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .lod-select select {
   font-size: 12px; padding: 2px 4px; border: 1px solid var(--border);
   border-radius: 4px; background: var(--bg); color: var(--text);
 }
 .shortcuts-pop {
-  position: absolute; left: 0; bottom: calc(100% + 8px); width: 300px;
+  position: absolute; left: 0; bottom: calc(100% + 8px); width: min(300px, calc(100vw - 48px)); z-index: 30;
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); padding: 12px; font-size: 12px;
 }

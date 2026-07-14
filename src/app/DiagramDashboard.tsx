@@ -3,10 +3,11 @@ import { useAppStore } from './store';
 import { listDiagrams } from '../core/persist/repository';
 import type { PersistedDiagram } from '../core/persist/repository';
 import {
-  switchDiagram, createDiagram, removeDiagram, renameDiagramById, duplicateDiagramById,
+  switchDiagram, createDiagram, removeDiagram, renameDiagramById, duplicateDiagramById, importDiagram,
 } from './usePersistence';
 import { formatDiagramDate } from './relativeDate';
 import { useOverlayEscape } from './overlayStack';
+import { SAMPLE_DBML } from './starter';
 
 interface Props {
   onClose: () => void;
@@ -58,6 +59,12 @@ export function DiagramDashboard({ onClose }: Props) {
         <aside className="dash-rail">
           <button className="dash-new" onClick={() => void createDiagram().then(onClose)}>
             New Diagram
+          </button>
+          <button
+            className="dash-sample"
+            onClick={() => void importDiagram({ name: 'E-commerce Sample', dbml: SAMPLE_DBML }).then(onClose)}
+          >
+            New Sample Diagram
           </button>
           <div className="dash-rail-label">My Diagrams</div>
         </aside>

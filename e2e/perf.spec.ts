@@ -23,6 +23,12 @@ test('120-table fixture renders inside the cold budget and pans without long-tas
   await page.goto('/');
   await expect(page.locator('.table-node').first()).toBeVisible(); // app booted (starter parsed)
 
+  // CI cold-start warmup: the FIRST load pays vite transform + the worker
+  // chunk compile; without this the perf:edit→perf:rendered measure charges
+  // dev-server costs to the app. Reload = same URL, warm caches.
+  await page.reload();
+  await expect(page.locator('.table-node').first()).toBeVisible();
+
   const fixture = makePerfFixture();
   await page.evaluate((dbml) => {
     performance.mark('perf:edit');

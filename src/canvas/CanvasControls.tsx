@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppStore } from '../app/store';
+import { useAppStore, getCanvasStack } from '../app/store';
 import type { LodOverride } from './lod';
 import { useOverlayEscape } from '../app/overlayStack';
 
@@ -27,6 +27,14 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
   const traceEnabled = useAppStore((s) => s.traceEnabled);
   const setTraceEnabled = useAppStore((s) => s.setTraceEnabled);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Toolbar undo/redo (Feature F). The stack is module-level (not store
+  // state) by design; canvasStackVersion is its change counter — bumped only
+  // inside the existing commit/undo/redo/load set() calls, so this component
+  // re-renders at gesture end, never per drag tick (perf contract).
+  const stackVersion = useAppStore((s) => s.canvasStackVersion);
+  void stackVersion; // the subscription IS the point — canUndo/canRedo below re-read on each bump
+  const stack = getCanvasStack();
 
   useOverlayEscape(shortcutsOpen, () => setShortcutsOpen(false));
 
@@ -77,6 +85,26 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
           <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.3" />
           <path d="M8 1v3M8 12v3M1 8h3M12 8h3" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      </button>
+      <button
+        aria-label="Undo canvas move"
+        title="Undo canvas move (Ctrl/Cmd+Z)"
+        disabled={!stack.canUndo()}
+        onClick={() => useAppStore.getState().undoCanvas()}
+      >
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M6 3L2 7l4 4M2 7h8a4 4 0 0 1 0 8H7" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        </svg>
+      </button>
+      <button
+        aria-label="Redo canvas move"
+        title="Redo canvas move (Shift+Ctrl/Cmd+Z)"
+        disabled={!stack.canRedo()}
+        onClick={() => useAppStore.getState().redoCanvas()}
+      >
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M10 3l4 4-4 4M14 7H6a4 4 0 0 0 0 8h3" fill="none" stroke="currentColor" strokeWidth="1.4" />
         </svg>
       </button>
       <label className="lod-select">
