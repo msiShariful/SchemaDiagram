@@ -2692,7 +2692,7 @@ git add -A && git commit -m "feat: group collapse — pill + chevrons, effective
 
 **Interfaces:**
 - **Undo/redo buttons (perf-contract trace, explicit):** the command stack is module-level by design (nothing subscribes to it). Task 3 added `canvasStackVersion`, bumped ONLY inside the `set()` calls that already fire at commit/undo/redo/load — zero new hot-path writes, and per-tick drag code never touches the store. `CanvasControls` subscribes to the VERSION (re-rendering at those same commit points only) and reads `getCanvasStack().canUndo()/canRedo()` for disabled state; clicks call the existing `undoCanvas`/`redoCanvas` actions. During a live drag nothing re-renders (the commit lands at gesture end — exactly when the buttons should update).
-- **<800 px shortcuts clip (P6 T13 finding):** `.shortcuts-pop`'s fixed `width: 300px` overflows a narrow canvas pane and gets clipped. Fix: `width: min(300px, calc(100vw - 48px));` + `z-index: 30;` (above the minimap/panel stack). No JS.
+- **<800 px shortcuts clip (P6 T13 finding):** `.shortcuts-pop`'s fixed `width: 300px` overflows a narrow canvas pane and gets clipped. Fix (revised in T12 review: the clip boundary is the PANE, not the viewport — the splitter can narrow the pane at any window width, so vw units never track it): `.canvas-pane` gains `container-type: inline-size;` and the pop uses `width: min(300px, calc(100cqw - 24px));` + `z-index: 30;` (above the minimap/panel stack). No JS. Safe: no position:fixed descendants inside the pane.
 - **Perf-spec cold-start warmup:** the timed run currently starts right after ONE cold `page.goto('/')` — on CI the mark absorbs dev-server transform + worker-chunk compile. Insert a reload (same URL, warm HTTP cache) between boot and timing; budgets unchanged.
 - **Sample diagram:** `SAMPLE_DBML` in `starter.ts` (the exact text below was parse-verified against the installed parser — Verified facts) + a "New Sample Diagram" rail button in the dashboard that reuses `importDiagram` (the existing create-with-content path: flushes the current diagram, invalidates autosave, creates + switches).
 
@@ -2745,7 +2745,7 @@ In `src/canvas/CanvasControls.tsx`:
 In `src/styles.css`, in the `.shortcuts-pop` rule, replace `width: 300px;` with:
 
 ```css
-  width: min(300px, calc(100vw - 48px)); z-index: 30;
+  width: min(300px, calc(100cqw - 24px)); z-index: 30;  /* + container-type: inline-size on .canvas-pane (T12 review revision) */
 ```
 
 (P6 T13 finding: a fixed 300 px popover clips inside a <800 px window's canvas pane.)
