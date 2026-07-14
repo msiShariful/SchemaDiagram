@@ -115,6 +115,19 @@ export function DiagramCanvas() {
   // maps; the imperative pan/drag paths never see it because hidden
   // tables/edges are simply not mounted.
   const hiddenSet = useMemo(() => new Set(hiddenTableIds), [hiddenTableIds]);
+  const traceEnabled = useAppStore((s) => s.traceEnabled);
+  const highlightTableId = useAppStore((s) => s.highlightTableId);
+  // Feature C: the KEEP set (highlight + 1-hop neighbors), render-time memo
+  // — recomputed only when refs/highlight change, never on the pan/drag paths.
+  const keepSet = useMemo(() => {
+    if (!traceEnabled || highlightTableId === null) return null;
+    const keep = new Set([highlightTableId]);
+    for (const r of schema.refs) {
+      if (r.from.tableId === highlightTableId) keep.add(r.to.tableId);
+      if (r.to.tableId === highlightTableId) keep.add(r.from.tableId);
+    }
+    return keep;
+  }, [schema, highlightTableId, traceEnabled]);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -296,6 +309,7 @@ export function DiagramCanvas() {
     const store = useAppStore.getState();
     if (!drag || !drag.moved) {
       store.setSelectedTables([id]);
+      if (store.traceEnabled) store.setHighlightTable(id); // dimming composes with selection
       return;
     }
     const tables: PositionDelta[] = drag.members.map((m) => ({
@@ -379,6 +393,7 @@ export function DiagramCanvas() {
         // the .dialog check keeps this from acting behind it.
         if (overlayDepth() > 0 || document.querySelector('.dialog')) return;
         useAppStore.getState().setSelectedTables([]);
+        useAppStore.getState().setHighlightTable(null);
         return;
       }
       if (e.key === ' ') {
@@ -579,6 +594,7 @@ export function DiagramCanvas() {
     const minSize = 4 / (zoomRef.current ?? 1); // tinier than this = a click on empty canvas
     if (sel.w < minSize && sel.h < minSize) {
       store.setSelectedTables([]);
+      if (store.highlightTableId !== null) store.setHighlightTable(null);
       return;
     }
     const items = visibleTableRects(store.schema, store.positions, store.hiddenTableIds); // can't select hidden
@@ -669,6 +685,7 @@ export function DiagramCanvas() {
                 onHover={setHoveredTable}
                 focused={t.id === editorFocusTableId}
                 selected={selectedSet.has(t.id)}
+                dimmed={keepSet !== null && !keepSet.has(t.id)}
                 onOpenInEditor={revealTable}
                 onOpenSettings={handleOpenSettings}
                 onRefDragStart={handleRefDragStart}

@@ -42,6 +42,8 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const hoveredTableId = useAppStore((s) => s.hoveredTableId);
+  const traceEnabled = useAppStore((s) => s.traceEnabled);
+  const highlightTableId = useAppStore((s) => s.highlightTableId);
   const selectedTableIds = useAppStore((s) => s.selectedTableIds);
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
@@ -107,8 +109,11 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
           hoveredTableId === spec.toTableId ||
           selectedSet.has(spec.fromTableId) ||
           selectedSet.has(spec.toTableId);
+        const dimmed =
+          traceEnabled && highlightTableId !== null &&
+          spec.fromTableId !== highlightTableId && spec.toTableId !== highlightTableId;
         return (
-          <g key={spec.id} className={`edge${hot ? ' hot' : ''}`}>
+          <g key={spec.id} className={`edge${hot ? ' hot' : ''}${dimmed ? ' dimmed' : ''}`}>
             <path
               d={p.d}
               ref={(el) => { if (el) pathRefs.current.set(spec.id, el); else pathRefs.current.delete(spec.id); }}

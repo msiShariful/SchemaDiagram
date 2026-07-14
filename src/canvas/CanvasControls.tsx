@@ -23,6 +23,8 @@ export function CanvasControls() {
   const setSnapEnabled = useAppStore((s) => s.setSnapEnabled);
   const lodOverride = useAppStore((s) => s.lodOverride);
   const setLodOverride = useAppStore((s) => s.setLodOverride);
+  const traceEnabled = useAppStore((s) => s.traceEnabled);
+  const setTraceEnabled = useAppStore((s) => s.setTraceEnabled);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useOverlayEscape(shortcutsOpen, () => setShortcutsOpen(false));
@@ -56,6 +58,18 @@ export function CanvasControls() {
       >
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
           <path d="M1 5.5h14M1 10.5h14M5.5 1v14M10.5 1v14" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        </svg>
+      </button>
+      <button
+        aria-pressed={traceEnabled}
+        className={traceEnabled ? 'active' : ''}
+        aria-label="Toggle highlight mode"
+        title={traceEnabled ? 'Highlight mode: on — click a table to trace its refs' : 'Highlight mode: off'}
+        onClick={() => setTraceEnabled(!traceEnabled)}
+      >
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M8 1v3M8 12v3M1 8h3M12 8h3" stroke="currentColor" strokeWidth="1.3" />
         </svg>
       </button>
       <label className="lod-select">

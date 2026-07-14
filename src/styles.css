@@ -394,3 +394,7 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .ep-inline-note { color: var(--text-dim); margin-bottom: 8px; }
 .ep-reveal { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
 .ep-error { color: var(--error); margin-top: 6px; }
+
+/* Plan 7 Feature C: highlight/trace dimming (visual only — selection, drag,
+   and hit-testing are unaffected; hidden ≠ dimmed) */
+.table-node.dimmed, .edge.dimmed { opacity: 0.15; transition: opacity 0.15s ease; }

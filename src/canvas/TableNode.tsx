@@ -14,6 +14,7 @@ interface Props {
   onHover: (id: string | null) => void;
   focused: boolean;
   selected: boolean;
+  dimmed: boolean; // Feature C: outside the traced 1-hop keep-set (CSS opacity only)
   onOpenInEditor: (id: string) => void;
   onOpenSettings: (id: string) => void; // stable callback (memo contract) — gear passes the id out
   onRefDragStart: (tableId: string, fieldName: string, e: React.PointerEvent) => void; // stable (memo contract) — REF-DRAG hand-off to DiagramCanvas
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export const TableNode = memo(function TableNode({
-  table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected,
+  table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected, dimmed,
   onOpenInEditor, onOpenSettings, onRefDragStart, registerEl,
 }: Props) {
   const gRef = useRef<SVGGElement | null>(null);
@@ -57,7 +58,7 @@ export const TableNode = memo(function TableNode({
         registerEl(table.id, el);
       }}
       transform={`translate(${pos.x}, ${pos.y})`}
-      className={`table-node${focused ? ' focused' : ''}${selected ? ' selected' : ''}`}
+      className={`table-node${focused ? ' focused' : ''}${selected ? ' selected' : ''}${dimmed ? ' dimmed' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
