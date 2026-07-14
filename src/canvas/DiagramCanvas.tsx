@@ -151,17 +151,17 @@ export function DiagramCanvas() {
   const handleOpenSettings = useCallback((id: string) => setSettingsTableId(id), []);
   const closeSettings = useCallback(() => setSettingsTableId(null), []);
 
-  // Edge popover (Feature A part 2): positioned from the click's client
-  // coords, converted to px inside .canvas-wrap — same "holds still during an
-  // imperative pan" ceiling as TableSettingsPopover.
-  const wrapRef = useRef<HTMLDivElement | null>(null);
+  // Edge popover (Feature A part 2): the click point is stored in WORLD
+  // coordinates; EdgeRefPopover recomputes screen px from the committed
+  // viewport each render (TableSettingsPopover's formula), so a pan/zoom
+  // commit re-syncs it. Mid-gesture it holds still until the gesture-end
+  // commit — same accepted ceiling as the settings popover.
   const handleEdgeClick = useCallback((refId: string, clientX: number, clientY: number) => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const r = wrap.getBoundingClientRect();
-    setEdgePopover({ refId, x: clientX - r.left + 8, y: clientY - r.top + 8 });
+    const w = toWorld(clientX, clientY);
+    setEdgePopover({ refId, x: w.x, y: w.y });
   }, []);
   const closeEdgePopover = useCallback(() => setEdgePopover(null), []);
+  // (toWorld reads refs only — the [] closure stays correct, same as endRefDrag.)
 
   // REF-DRAG (Feature A): capture on the stable <svg> — a mid-gesture parse
   // can unmount the source row, but the svg outlives it; the svg's own
@@ -634,7 +634,7 @@ export function DiagramCanvas() {
   };
 
   return (
-    <div ref={wrapRef} className={`canvas-wrap${viewsOpen ? ' views-open' : ''}`}>
+    <div className={`canvas-wrap${viewsOpen ? ' views-open' : ''}`}>
       <svg
         ref={svgRef}
         className="diagram-canvas"

@@ -1867,7 +1867,7 @@ git add -A && git commit -m "feat: ref authoring by drag — field handles, impe
 
 **Interfaces:**
 - `EdgeLayer` gains a widened hit target per edge: a SECOND `<path className="edge-hit">` sharing the same `d` (transparent stroke, `stroke-width: 12`, `pointer-events: stroke`, pointer cursor) rendered after the visible path, wired to a new stable prop `onEdgeClick(refId: string, clientX: number, clientY: number)`. A parallel `hitRefs` map keeps the hit path in sync inside the imperative `updateTablePositions` (both paths get the same `setAttribute('d', …)` — the popover hit area cannot drift during a drag).
-- `DiagramCanvas` hosts the single popover instance in the HTML layer (the `TableSettingsPopover` host pattern): `const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null)` — x/y are px inside `.canvas-wrap`, computed from the click's client coords minus the wrap's bounding rect. Like the settings popover, it holds still during an imperative pan until the gesture-end commit (same accepted ceiling).
+- `DiagramCanvas` hosts the single popover instance in the HTML layer (the `TableSettingsPopover` host pattern): `const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null)` — x/y are the click point in WORLD coordinates (via the existing `toWorld`); `EdgeRefPopover` recomputes screen px from the committed `viewport` each render (TableSettingsPopover's formula), so a pan/zoom commit re-syncs its position. Like the settings popover, it holds still during an imperative pan until the gesture-end commit (same accepted ceiling). *(Task-8 review fix: the original screen-px capture never re-synced after a committed pan/zoom.)*
 - `EdgeRefPopover({ refId, x, y, onClose })`: looks the ref up by id in the last-good schema each render and CLOSES when it vanishes (parse deleted it / diagram switched — the TableSettingsPopover lifecycle rule). Ref ids are `ref-${index}-${fromId}-${toId}` — an operator swap keeps index and endpoint tables, so the SAME popover stays open across its own edit and the radio re-checks from the fresh parse.
   - Standalone ref: shows `formatRefText(ref)`, four cardinality radios (`<` one-to-many, `>` many-to-one, `-` one-to-one, `<>` many-to-many; checked = `refOperator(ref)`), and **Delete ref**. Radio change → `applyRefOperator(ref, op)`; Delete → `deleteRefLine(ref)` then close. Both are TEXT edits via the bridge; a `false` return (line unlocatable — e.g. the block form `Ref { … }`) surfaces as an inline error line, never a silent no-op.
   - `ref.inline === true` (Task 2's flag): radios and Delete are NOT rendered; the popover shows *"Defined inline — edit it in the DBML."* with a **Reveal** button → `revealPosition(ref.pos.line, ref.pos.column)` (the token start — chosen over `revealTable` because normalized endpoint order does NOT identify the defining table for inline refs, per Verified facts; falls back to `revealTable(ref.from.tableId)` when `pos` is null) and closes.
@@ -1919,8 +1919,11 @@ interface EdgeLayerProps {
 5. `src/styles.css` — append:
 
 ```css
-/* Plan 7 Feature A: widened edge hit target + popover */
-.edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+/* Plan 7 Feature A: widened edge hit target + popover.
+   Selector must be .edge .edge-hit (0-2-0): the pre-existing `.edge path`
+   rule is 0-1-1 and would otherwise win, rendering the hit target 1.5px
+   colored instead of 12px transparent. (Task-8 review fix.) */
+.edge .edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 ```
 
 - [ ] **Step 2: The popover component**
@@ -1943,9 +1946,9 @@ const OPERATORS: Array<{ op: RefOperator; label: string }> = [
 
 interface Props {
   refId: string;
-  x: number; // px inside .canvas-wrap (from the committed click point;
-  y: number; // holds still during an imperative pan — same accepted ceiling
-  onClose: () => void; // as TableSettingsPopover)
+  x: number; // click point in WORLD coordinates — screen px are recomputed
+  y: number; // from the committed viewport each render, so a pan/zoom commit
+  onClose: () => void; // re-syncs the popover (TableSettingsPopover's pattern)
 }
 
 /** Edge popover (Feature A). CRITICAL architecture rule: every mutation is a
@@ -1956,6 +1959,7 @@ interface Props {
  *  standalone line to rewrite, and rewriting field settings is out of scope. */
 export function EdgeRefPopover({ refId, x, y, onClose }: Props) {
   const ref = useAppStore((s) => s.schema.refs.find((r) => r.id === refId));
+  const viewport = useAppStore((s) => s.viewport);
   const [err, setErr] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -1991,7 +1995,14 @@ export function EdgeRefPopover({ refId, x, y, onClose }: Props) {
   };
 
   return (
-    <div ref={rootRef} className="edge-popover" style={{ left: x, top: y }}>
+    <div
+      ref={rootRef}
+      className="edge-popover"
+      style={{
+        left: viewport.x + x * viewport.zoom + 8,
+        top: viewport.y + y * viewport.zoom + 8,
+      }}
+    >
       <div className="ep-title">{formatRefText(ref)}</div>
       {ref.inline ? (
         <>
@@ -2033,20 +2044,17 @@ In `src/canvas/DiagramCanvas.tsx`:
   const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null);
 ```
 
-3. Stable handlers, next to `handleOpenSettings`:
+3. Stable handlers, next to `handleOpenSettings` (world coords via the existing `toWorld`; it reads refs only, so the `[]` closure stays correct — same as `endRefDrag`):
 
 ```ts
-  const wrapRef = useRef<HTMLDivElement | null>(null);
   const handleEdgeClick = useCallback((refId: string, clientX: number, clientY: number) => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const r = wrap.getBoundingClientRect();
-    setEdgePopover({ refId, x: clientX - r.left + 8, y: clientY - r.top + 8 });
+    const w = toWorld(clientX, clientY);
+    setEdgePopover({ refId, x: w.x, y: w.y });
   }, []);
   const closeEdgePopover = useCallback(() => setEdgePopover(null), []);
 ```
 
-4. Attach `ref={wrapRef}` to the root `.canvas-wrap` div, pass `onEdgeClick={handleEdgeClick}` to `<EdgeLayer …>`, and render next to the settings popover:
+4. Pass `onEdgeClick={handleEdgeClick}` to `<EdgeLayer …>` and render next to the settings popover:
 
 ```tsx
       {edgePopover && (

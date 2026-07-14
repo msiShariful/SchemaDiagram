@@ -374,8 +374,11 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .field-row:hover .ref-handle { opacity: 1; }
 .ref-drag-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
 
-/* Plan 7 Feature A (part 2): widened edge hit target + popover */
-.edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+/* Plan 7 Feature A (part 2): widened edge hit target + popover.
+   Selector must be .edge .edge-hit (0-2-0): the pre-existing `.edge path`
+   rule above is 0-1-1 and would otherwise win, rendering the hit target
+   1.5px colored instead of 12px transparent. */
+.edge .edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 .edge-popover {
   position: absolute; z-index: 25; min-width: 200px; max-width: 260px;
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px;

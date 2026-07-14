@@ -13,9 +13,9 @@ const OPERATORS: Array<{ op: RefOperator; label: string }> = [
 
 interface Props {
   refId: string;
-  x: number; // px inside .canvas-wrap (from the committed click point;
-  y: number; // holds still during an imperative pan — same accepted ceiling
-  onClose: () => void; // as TableSettingsPopover)
+  x: number; // click point in WORLD coordinates — screen px are recomputed
+  y: number; // from the committed viewport each render, so a pan/zoom commit
+  onClose: () => void; // re-syncs the popover (TableSettingsPopover's pattern)
 }
 
 /** Edge popover (Feature A). CRITICAL architecture rule: every mutation is a
@@ -26,6 +26,7 @@ interface Props {
  *  standalone line to rewrite, and rewriting field settings is out of scope. */
 export function EdgeRefPopover({ refId, x, y, onClose }: Props) {
   const ref = useAppStore((s) => s.schema.refs.find((r) => r.id === refId));
+  const viewport = useAppStore((s) => s.viewport);
   const [err, setErr] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -61,7 +62,14 @@ export function EdgeRefPopover({ refId, x, y, onClose }: Props) {
   };
 
   return (
-    <div ref={rootRef} className="edge-popover" style={{ left: x, top: y }}>
+    <div
+      ref={rootRef}
+      className="edge-popover"
+      style={{
+        left: viewport.x + x * viewport.zoom + 8,
+        top: viewport.y + y * viewport.zoom + 8,
+      }}
+    >
       <div className="ep-title">{formatRefText(ref)}</div>
       {ref.inline ? (
         <>
