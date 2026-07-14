@@ -35,9 +35,10 @@ function edgePath(
 
 interface EdgeLayerProps {
   viewRect: Rect | null;
+  onEdgeClick: (refId: string, clientX: number, clientY: number) => void; // stable (DiagramCanvas useCallback)
 }
 
-export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function EdgeLayer({ viewRect }, ref) {
+export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function EdgeLayer({ viewRect, onEdgeClick }, ref) {
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const hoveredTableId = useAppStore((s) => s.hoveredTableId);
@@ -45,6 +46,7 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
   const selectedSet = useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
   const hiddenTableIds = useAppStore((s) => s.hiddenTableIds);
   const pathRefs = useRef(new Map<string, SVGPathElement>());
+  const hitRefs = useRef(new Map<string, SVGPathElement>());
 
   // Feature D: filtering HERE means render, specsByTable, and the imperative
   // updateTablePositions path all inherit it — an edge with a hidden endpoint
@@ -74,7 +76,10 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
       }
       for (const spec of touched) {
         const p = edgePath(spec, live, tablesById);
-        if (p) pathRefs.current.get(spec.id)?.setAttribute('d', p.d);
+        if (p) {
+          pathRefs.current.get(spec.id)?.setAttribute('d', p.d);
+          hitRefs.current.get(spec.id)?.setAttribute('d', p.d); // popover hit area tracks the drag
+        }
       }
     },
   }), [positions, specsByTable, tablesById]);
@@ -107,6 +112,12 @@ export const EdgeLayer = forwardRef<EdgeLayerHandle, EdgeLayerProps>(function Ed
             <path
               d={p.d}
               ref={(el) => { if (el) pathRefs.current.set(spec.id, el); else pathRefs.current.delete(spec.id); }}
+            />
+            <path
+              className="edge-hit"
+              d={p.d}
+              ref={(el) => { if (el) hitRefs.current.set(spec.id, el); else hitRefs.current.delete(spec.id); }}
+              onClick={(e) => onEdgeClick(spec.id, e.clientX, e.clientY)}
             />
             <text x={p.label1.x} y={p.label1.y} className="edge-label">{p.label1.text}</text>
             <text x={p.label2.x} y={p.label2.y} className="edge-label">{p.label2.text}</text>

@@ -373,3 +373,19 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 .ref-handle { fill: var(--accent); stroke: var(--bg-elev); stroke-width: 1.5; opacity: 0; cursor: crosshair; }
 .field-row:hover .ref-handle { opacity: 1; }
 .ref-drag-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+
+/* Plan 7 Feature A (part 2): widened edge hit target + popover */
+.edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+.edge-popover {
+  position: absolute; z-index: 25; min-width: 200px; max-width: 260px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16); padding: 10px; font-size: 12px; color: var(--text);
+}
+.ep-title { font-family: ui-monospace, monospace; font-size: 11px; margin-bottom: 8px; word-break: break-all; }
+.ep-ops { display: flex; gap: 10px; margin-bottom: 8px; }
+.ep-op { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+.ep-op-glyph { font-family: ui-monospace, monospace; font-weight: 600; }
+.ep-delete { border: 1px solid var(--border); background: none; color: var(--error); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+.ep-inline-note { color: var(--text-dim); margin-bottom: 8px; }
+.ep-reveal { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+.ep-error { color: var(--error); margin-top: 6px; }

@@ -5,6 +5,7 @@ import { GroupLayer } from './GroupLayer';
 import { MiniMap, type MiniMapHandle } from './MiniMap';
 import { TableNode } from './TableNode';
 import { TableSettingsPopover } from './TableSettingsPopover';
+import { EdgeRefPopover } from './EdgeRefPopover';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -97,6 +98,7 @@ export function DiagramCanvas() {
   const [zoomPct, setZoomPct] = useState(Math.round(vpRef.current.zoom * 100));
   const [layoutBusy, setLayoutBusy] = useState(false);
   const [settingsTableId, setSettingsTableId] = useState<string | null>(null);
+  const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null);
   // Lifted from DiagramViewsSidebar so the expanded panel can shift the
   // zoom controls + minimap out from under it via a class on .canvas-wrap.
   const [viewsOpen, setViewsOpen] = useState(false);
@@ -148,6 +150,18 @@ export function DiagramCanvas() {
   // the popover itself lives in the HTML layer below, outside the SVG.
   const handleOpenSettings = useCallback((id: string) => setSettingsTableId(id), []);
   const closeSettings = useCallback(() => setSettingsTableId(null), []);
+
+  // Edge popover (Feature A part 2): positioned from the click's client
+  // coords, converted to px inside .canvas-wrap — same "holds still during an
+  // imperative pan" ceiling as TableSettingsPopover.
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const handleEdgeClick = useCallback((refId: string, clientX: number, clientY: number) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const r = wrap.getBoundingClientRect();
+    setEdgePopover({ refId, x: clientX - r.left + 8, y: clientY - r.top + 8 });
+  }, []);
+  const closeEdgePopover = useCallback(() => setEdgePopover(null), []);
 
   // REF-DRAG (Feature A): capture on the stable <svg> — a mid-gesture parse
   // can unmount the source row, but the svg outlives it; the svg's own
@@ -620,7 +634,7 @@ export function DiagramCanvas() {
   };
 
   return (
-    <div className={`canvas-wrap${viewsOpen ? ' views-open' : ''}`}>
+    <div ref={wrapRef} className={`canvas-wrap${viewsOpen ? ' views-open' : ''}`}>
       <svg
         ref={svgRef}
         className="diagram-canvas"
@@ -632,7 +646,7 @@ export function DiagramCanvas() {
       >
         <g ref={sceneRef}>
           <GroupLayer zoomRef={zoomRef} onLiveMoveSet={handleGroupLiveMove} onCommitMoveSet={handleGroupCommit} />
-          <EdgeLayer ref={edgeLayerRef} viewRect={viewRect} />
+          <EdgeLayer ref={edgeLayerRef} viewRect={viewRect} onEdgeClick={handleEdgeClick} />
           {schema.tables.map((t) => {
             if (hiddenSet.has(t.id)) return null; // Feature D: hidden = not mounted
             const pos = positions[t.id];
@@ -693,6 +707,9 @@ export function DiagramCanvas() {
       <CanvasControls />
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
+      {edgePopover && (
+        <EdgeRefPopover refId={edgePopover.refId} x={edgePopover.x} y={edgePopover.y} onClose={closeEdgePopover} />
+      )}
     </div>
   );
 }
