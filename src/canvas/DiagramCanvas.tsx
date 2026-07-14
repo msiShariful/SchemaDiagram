@@ -663,6 +663,48 @@ export function DiagramCanvas() {
     useAppStore.getState().setViewport(fitViewport(rects, rect.width, rect.height));
   };
 
+  /** Glide tables + camera to the arranged layout (dbdiagram feel), then
+   *  commit ONCE — drag discipline: per-frame writes are imperative
+   *  (nodeEls/EdgeLayer/applyTransform), so a mid-glide React render stomp
+   *  self-corrects on the next frame, and the store never sees per-tick
+   *  positions. Input is suppressed for the duration (pointer-events),
+   *  so no gesture can start against in-flight transforms. */
+  const glideTo = (
+    moves: Array<{ id: string; from: TablePosition; to: TablePosition }>,
+    vpTo: Viewport,
+    onDone: () => void,
+  ) => {
+    const svg = svgRef.current!;
+    const vpFrom = { ...vpRef.current };
+    const t0 = performance.now();
+    const DURATION = 450;
+    const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+    svg.style.pointerEvents = 'none';
+    const tick = () => {
+      const k = Math.min(1, (performance.now() - t0) / DURATION);
+      const e = ease(k);
+      const live: Record<string, TablePosition> = {};
+      for (const m of moves) {
+        const p = { x: m.from.x + (m.to.x - m.from.x) * e, y: m.from.y + (m.to.y - m.from.y) * e };
+        live[m.id] = p;
+        nodeEls.current.get(m.id)?.setAttribute('transform', `translate(${p.x}, ${p.y})`);
+      }
+      edgeLayerRef.current?.updateTablePositions(live);
+      vpRef.current = {
+        x: vpFrom.x + (vpTo.x - vpFrom.x) * e,
+        y: vpFrom.y + (vpTo.y - vpFrom.y) * e,
+        zoom: vpFrom.zoom + (vpTo.zoom - vpFrom.zoom) * e,
+      };
+      applyTransform();
+      if (k < 1) requestAnimationFrame(tick);
+      else {
+        svg.style.pointerEvents = '';
+        onDone();
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
   const autoLayout = async () => {
     const { schema, hiddenTableIds, collapsedGroupIds } = useAppStore.getState();
     if (schema.tables.length === 0 || layoutBusy) return;
@@ -670,18 +712,43 @@ export function DiagramCanvas() {
     try {
       const next = await runElkLayout(schema, [...effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds)]); // visible only; hidden/collapsed keep their positions
       const st = useAppStore.getState();
-      if (st.schema !== schema) return; // schema changed mid-layout: stale result, discard
+      if (st.schema !== schema) {
+        setLayoutBusy(false); // stale result, discard (no finally: busy now outlives the await)
+        return;
+      }
       const tables = Object.keys(next).map((id) => ({
         id,
         before: st.positions[id] ?? next[id], // unknown before → zero delta → pruned
         after: next[id],
       }));
-      st.commitCanvasCommand({ label: 'auto-layout', tables, notes: [] });
-      fit();
+      const commit = () => {
+        useAppStore.getState().commitCanvasCommand({ label: 'auto-layout', tables, notes: [] });
+        setLayoutBusy(false);
+      };
+      // Camera target: fit the ARRANGED layout, not the current one.
+      const arranged = { ...st.positions, ...next };
+      const rects = visibleTableRects(
+        schema,
+        arranged,
+        effectiveHiddenIds(schema, st.hiddenTableIds, st.collapsedGroupIds),
+      ).map((x) => x.rect);
+      const box = svgRef.current!.getBoundingClientRect();
+      const vpTo = fitViewport(rects, box.width, box.height);
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        commit();
+        useAppStore.getState().setViewport(vpTo);
+        return;
+      }
+      const moves = tables
+        .filter((t) => t.before.x !== t.after.x || t.before.y !== t.after.y)
+        .map((t) => ({ id: t.id, from: t.before, to: t.after }));
+      glideTo(moves, vpTo, () => {
+        commit();
+        useAppStore.getState().setViewport(vpTo);
+      });
     } catch (err) {
       // layout unavailable (worker + fallback both failed) — positions untouched
       window.alert(`Auto-layout failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
       setLayoutBusy(false);
     }
   };
