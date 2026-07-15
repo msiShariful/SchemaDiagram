@@ -8,6 +8,7 @@ import { TableSettingsPopover } from './TableSettingsPopover';
 import { EdgeRefPopover } from './EdgeRefPopover';
 import { QuickSearch } from './QuickSearch';
 import { FieldNotePopover } from './FieldNotePopover';
+import { TableColorStrip } from './TableColorStrip';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -113,6 +114,30 @@ export function DiagramCanvas() {
   // Lifted from DiagramViewsSidebar so the expanded panel can shift the
   // zoom controls + minimap out from under it via a class on .canvas-wrap.
   const [viewsOpen, setViewsOpen] = useState(false);
+  // Quick color strip (dbdiagram parity): follows the hovered table with a
+  // 250 ms linger so the pointer can cross the gap into the strip; the strip
+  // refreshes the hold via onKeep. Hover-transient chrome — not an overlay.
+  const hoveredTableId = useAppStore((s) => s.hoveredTableId);
+  const [stripTableId, setStripTableId] = useState<string | null>(null);
+  const stripLinger = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (hoveredTableId !== null) {
+      if (stripLinger.current) clearTimeout(stripLinger.current);
+      setStripTableId(hoveredTableId);
+      return;
+    }
+    stripLinger.current = setTimeout(() => setStripTableId(null), 250);
+    return () => {
+      if (stripLinger.current) clearTimeout(stripLinger.current);
+    };
+  }, [hoveredTableId]);
+  const stripKeep = useCallback(() => {
+    if (stripLinger.current) clearTimeout(stripLinger.current);
+  }, []);
+  const stripRelease = useCallback(() => {
+    stripLinger.current = setTimeout(() => setStripTableId(null), 150);
+  }, []);
+
   // Hand tool: primitive subscription — re-renders only on toggle (cursor class).
   const panMode = useAppStore((s) => s.panMode);
 
@@ -889,6 +914,9 @@ export function DiagramCanvas() {
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
       {fieldNoteTarget && <FieldNotePopover tableId={fieldNoteTarget.tableId} fieldName={fieldNoteTarget.fieldName} onClose={closeFieldNote} />}
+      {stripTableId && !settingsTableId && (
+        <TableColorStrip tableId={stripTableId} onKeep={stripKeep} onRelease={stripRelease} onOpenSettings={handleOpenSettings} />
+      )}
       {edgePopover && (
         <EdgeRefPopover refId={edgePopover.refId} x={edgePopover.x} y={edgePopover.y} onClose={closeEdgePopover} />
       )}
