@@ -28,10 +28,11 @@ export function computeExportBounds(
   notePositions: Record<string, TablePosition>,
   hiddenTableIds: readonly string[] = [],
   collapsedGroupIds: readonly string[] = [],
+  noteSizes: Record<string, { w: number; h: number }> = {},
 ): Rect | null {
   const effectiveHidden = effectiveHiddenIds(schema, hiddenTableIds, collapsedGroupIds);
   const tableRects = visibleTableRects(schema, positions, effectiveHidden).map((x) => x.rect);
-  const noteRects = schema.notes.filter((n) => notePositions[n.id]).map((n) => getNoteRect(notePositions[n.id]));
+  const noteRects = schema.notes.filter((n) => notePositions[n.id]).map((n) => getNoteRect(notePositions[n.id], noteSizes[n.id]));
   const visPositions = omitHidden(positions, effectiveHidden);
   const explicitPositions = omitHidden(positions, hiddenTableIds);
   const collapsed = new Set(collapsedGroupIds);

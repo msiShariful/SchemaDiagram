@@ -34,13 +34,13 @@ export function buildDiagramSvg(): BuiltSvg | null {
   // tree through an off-screen zoom, which is a real feature, not a CSS fix
   // — deferred. EXPORT_CSS styles `.table-box` so that ceiling degrades to
   // "plain colored boxes" rather than invisible/unstyled rects.
-  const { schema, positions, notePositions, hiddenTableIds, collapsedGroupIds } = useAppStore.getState();
+  const { schema, positions, notePositions, hiddenTableIds, collapsedGroupIds, noteSizes } = useAppStore.getState();
   // Hidden (and collapsed-group-member) tables are not mounted, so the
   // cloned scene is already free of them — the bounds must agree or exports
   // gain empty margins. computeExportBounds derives the effective hidden set
   // itself (and separately accounts for collapsed groups' pills), so the raw
   // explicit hiddenTableIds/collapsedGroupIds are passed through as-is.
-  const bounds = computeExportBounds(schema, positions, notePositions, hiddenTableIds, collapsedGroupIds);
+  const bounds = computeExportBounds(schema, positions, notePositions, hiddenTableIds, collapsedGroupIds, noteSizes);
   if (!scene || !bounds) return null;
   const b = expandRect(bounds, EXPORT_MARGIN);
 

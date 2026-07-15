@@ -395,11 +395,18 @@ describe('view state (Plan 6): hiddenTableIds, session flags, createdAt', () => 
     const onlyA = "Table t { id int }\nNote a { 'x' }";
     useAppStore.getState().applyParse(parseDbml(onlyA), onlyA);
     expect(useAppStore.getState().noteColors).toEqual({ [na]: '#cfe5ff' });
+    // sizes ride the same lane: set, prune to survivors, default on old records
+    useAppStore.getState().setNoteSize(na, { w: 260, h: 180 });
+    useAppStore.getState().setNoteSize('ghost', { w: 300, h: 300 });
+    const onlyA2 = "Table t { id int }\nNote a { 'x' }";
+    useAppStore.getState().applyParse(parseDbml(onlyA2), onlyA2);
+    expect(useAppStore.getState().noteSizes).toEqual({ [na]: { w: 260, h: 180 } });
     // pre-noteColors record loads with the default
     useAppStore.getState().loadDiagram({
       id: 'z', name: 'Z', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
     });
     expect(useAppStore.getState().noteColors).toEqual({});
+    expect(useAppStore.getState().noteSizes).toEqual({});
   });
 
   it('loadDiagram does NOT touch snapEnabled/lodOverride/panMode (session state)', () => {

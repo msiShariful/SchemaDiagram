@@ -584,3 +584,9 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   margin-top: 6px; font-size: 12px; padding: 4px 10px; border: 1px solid var(--border);
   background: var(--bg-elev); color: var(--text); border-radius: 5px; cursor: pointer;
 }
+
+/* Sticky-note resize grip (SE corner). */
+.note-resize { cursor: nwse-resize; opacity: 0; transition: opacity 0.12s ease; }
+.sticky-note:hover .note-resize { opacity: 1; }
+.note-resize-grip { stroke: var(--text-dim); stroke-width: 1.4; stroke-linecap: round; fill: none; }
+.note-resize:hover .note-resize-grip { stroke: var(--accent); }

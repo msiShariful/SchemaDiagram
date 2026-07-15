@@ -24,8 +24,8 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
 export const NOTE_WIDTH = 180;
 export const NOTE_HEIGHT = 120;
 
-export function getNoteRect(pos: TablePosition): Rect {
-  return { x: pos.x, y: pos.y, w: NOTE_WIDTH, h: NOTE_HEIGHT };
+export function getNoteRect(pos: TablePosition, size?: { w: number; h: number }): Rect {
+  return { x: pos.x, y: pos.y, w: size?.w ?? NOTE_WIDTH, h: size?.h ?? NOTE_HEIGHT };
 }
 
 export function unionRects(rects: Rect[]): Rect | null {

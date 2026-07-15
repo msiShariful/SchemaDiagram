@@ -12,6 +12,7 @@ export interface ProjectFile {
   layout: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
   noteColors?: Record<string, string>; // optional: sticky-note tints (view state, like notePositions)
+  noteSizes?: Record<string, { w: number; h: number }>; // optional: sticky-note sizes (same lane)
   hiddenTableIds?: string[]; // optional: pre-Plan-6 files lack it (Feature D view state)
   collapsedGroupIds?: string[]; // optional: pre-Plan-7 files lack it (group-collapse view state)
   viewport: Viewport;
@@ -27,6 +28,7 @@ export function serializeProject(p: {
   positions: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
   noteColors?: Record<string, string>; // optional: sticky-note tints (view state, like notePositions)
+  noteSizes?: Record<string, { w: number; h: number }>; // optional: sticky-note sizes (same lane)
   hiddenTableIds?: string[];
   collapsedGroupIds?: string[];
   viewport: Viewport;
@@ -38,6 +40,7 @@ export function serializeProject(p: {
     layout: p.positions,
     notePositions: p.notePositions,
     noteColors: p.noteColors && Object.keys(p.noteColors).length > 0 ? p.noteColors : undefined,
+    noteSizes: p.noteSizes && Object.keys(p.noteSizes).length > 0 ? p.noteSizes : undefined,
     hiddenTableIds: p.hiddenTableIds && p.hiddenTableIds.length > 0 ? p.hiddenTableIds : undefined,
     collapsedGroupIds: p.collapsedGroupIds && p.collapsedGroupIds.length > 0 ? p.collapsedGroupIds : undefined,
     viewport: p.viewport,
@@ -120,6 +123,23 @@ export function parseProject(text: string): ProjectParseResult {
     }
     noteColors = out;
   }
+  // noteSizes is optional. Trust boundary: map of {w,h} finite positives.
+  let noteSizes: Record<string, { w: number; h: number }> | undefined;
+  if (o.noteSizes !== undefined) {
+    const m = o.noteSizes;
+    if (typeof m !== 'object' || m === null || Array.isArray(m)) {
+      return { ok: false, error: 'Project file "noteSizes" must be an object map.' };
+    }
+    const out: Record<string, { w: number; h: number }> = {};
+    for (const [k, v] of Object.entries(m)) {
+      const size = v as { w?: unknown; h?: unknown } | null;
+      if (!size || !isFiniteNumber(size.w) || !isFiniteNumber(size.h) || size.w <= 0 || size.h <= 0) {
+        return { ok: false, error: 'Project file "noteSizes" values must have positive numeric w and h.' };
+      }
+      out[k] = { w: size.w, h: size.h };
+    }
+    noteSizes = out;
+  }
   // hiddenTableIds is optional (pre-Plan-6 files). It is a plain string
   // array — no reserved-key hazard (that only exists for object maps) — so
   // the trust boundary is: array, all entries strings.
@@ -154,6 +174,7 @@ export function parseProject(text: string): ProjectParseResult {
       layout: layoutResult.value,
       ...(notePositions !== undefined ? { notePositions } : {}),
       ...(noteColors !== undefined ? { noteColors } : {}),
+      ...(noteSizes !== undefined ? { noteSizes } : {}),
       ...(hiddenTableIds !== undefined ? { hiddenTableIds } : {}),
       ...(collapsedGroupIds !== undefined ? { collapsedGroupIds } : {}),
       viewport: { x: vp.x, y: vp.y, zoom: vp.zoom },

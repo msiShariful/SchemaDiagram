@@ -191,3 +191,20 @@ describe('noteColors (optional — backward compatible)', () => {
     expect(parseProject(JSON.stringify(badType)).ok).toBe(false);
   });
 });
+
+describe('noteSizes (optional — backward compatible)', () => {
+  it('round-trips, omits when empty, and rejects malformed values', () => {
+    const base = { name: 'n', dbml: 'Table t { id int }', positions: {}, viewport: { x: 0, y: 0, zoom: 1 } };
+    const out = serializeProject({ ...base, noteSizes: { memo: { w: 260, h: 180 } } });
+    const r = parseProject(out);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.project.noteSizes).toEqual({ memo: { w: 260, h: 180 } });
+    expect(JSON.parse(serializeProject({ ...base, noteSizes: {} }))).not.toHaveProperty('noteSizes');
+    const bad = JSON.parse(out);
+    bad.noteSizes = { memo: { w: -5, h: 100 } };
+    expect(parseProject(JSON.stringify(bad)).ok).toBe(false);
+    const bad2 = JSON.parse(out);
+    bad2.noteSizes = { memo: { w: 'wide', h: 100 } };
+    expect(parseProject(JSON.stringify(bad2)).ok).toBe(false);
+  });
+});
