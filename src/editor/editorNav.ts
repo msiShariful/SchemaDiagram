@@ -4,6 +4,7 @@ import { buildTableRanges, rangeForTable } from './sourceMap';
 import { formatDbmlSource } from '../core/format/formatDbml';
 import { useAppStore } from '../app/store';
 import { rewriteTableHeader, type TableHeaderEdit } from './tableSettings';
+import { buildFieldNoteSplice } from './fieldNote';
 import { findRefLine, MIRRORED, type RefOperator } from './refEdit';
 import type { Ref } from '../core/model/types';
 
@@ -90,6 +91,22 @@ export function applyTableSettings(tableId: string, edit: TableHeaderEdit): bool
 /** Feature A (canvas→text bridge, second consumer): append a standalone Ref
  *  line at the end of the document. ONE transaction; editor history owns
  *  undo; the parse pipeline renders the new edge ~300 ms later. */
+/** Canvas→text bridge: set/replace/remove a field's inline note. ONE
+ *  transaction; refusal (false) when the rewriter can't prove the splice. */
+export function applyFieldNote(tableId: string, fieldName: string, note: string | null): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const doc = view.state.doc.toString();
+  const splice = buildFieldNoteSplice(doc, tableId, fieldName, note);
+  if (splice === null) return false;
+  if (splice.from === splice.to && splice.insert === '') return true; // no-op
+  view.dispatch({
+    changes: { from: splice.from, to: splice.to, insert: splice.insert },
+    userEvent: 'canvas.settings',
+  });
+  return true;
+}
+
 export function appendRefLine(line: string): boolean {
   const view = currentView;
   if (!view) return false;

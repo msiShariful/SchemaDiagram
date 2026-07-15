@@ -27,6 +27,7 @@ export const EXPORT_CSS = [
   '.note-title { font-size: 11px; font-weight: 600; fill: var(--text); }',
   '.note-content { font-size: 11px; color: var(--text); font-family: system-ui, sans-serif; white-space: pre-wrap; overflow: hidden; height: 100%; }',
   '.note-swatches { display: none; }', // hover palette is screen furniture
+  '.field-note-btn { display: none; }', // hover row action, ditto
   '.sticky-note.colored .note-title { fill: #2f3237; }',
   '.sticky-note.colored .note-content { color: #2f3237; }',
   // Plan 7 Feature B: field badges + note dots.

@@ -20,12 +20,13 @@ interface Props {
   onRefDragStart: (tableId: string, fieldName: string, e: React.PointerEvent) => void; // stable (memo contract) — REF-DRAG hand-off to DiagramCanvas
   registerEl: (id: string, el: SVGGElement | null) => void;
   onFieldHover: (f: { tableId: string; fieldName: string } | null) => void; // stable store action (memo contract)
+  onEditFieldNote: (tableId: string, fieldName: string) => void; // stable (memo contract) — opens the note popover
   hotFields: readonly string[] | null; // endpoint rows of the hovered edge; null (stable) for uninvolved tables
 }
 
 export const TableNode = memo(function TableNode({
   table, pos, zoomRef, lod, onLiveMove, onCommitMove, onHover, focused, selected, dimmed,
-  onOpenInEditor, onOpenSettings, onRefDragStart, registerEl, onFieldHover, hotFields,
+  onOpenInEditor, onOpenSettings, onRefDragStart, registerEl, onFieldHover, hotFields, onEditFieldNote,
 }: Props) {
   const gRef = useRef<SVGGElement | null>(null);
   const drag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -124,6 +125,21 @@ export const TableNode = memo(function TableNode({
                     {badges !== '' && <tspan className="field-badges">{badges} </tspan>}
                     {fit.type}
                   </text>
+                  {/* Field-note editor (hover-visible like the gear). Sits
+                      over the tail of the type text while shown — transient,
+                      dbdiagram-style row action. */}
+                  <g
+                    className="field-note-btn"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => onEditFieldNote(table.id, f.name)}
+                  >
+                    <title>{f.note !== null ? 'Edit field note' : 'Add field note'}</title>
+                    <rect x={TABLE_WIDTH - 34} y={ROW_HEIGHT / 2 - 8} width={16} height={16} rx={3} className="field-note-btn-bg" />
+                    <path
+                      d={`M${TABLE_WIDTH - 30} ${ROW_HEIGHT / 2 + 3.5} l7.5 -7.5 l2.5 2.5 l-7.5 7.5 l-3 .5 z`}
+                      className="field-note-btn-glyph"
+                    />
+                  </g>
                   <circle
                     className="ref-handle"
                     cx={TABLE_WIDTH - 6}

@@ -7,6 +7,7 @@ import { TableNode } from './TableNode';
 import { TableSettingsPopover } from './TableSettingsPopover';
 import { EdgeRefPopover } from './EdgeRefPopover';
 import { QuickSearch } from './QuickSearch';
+import { FieldNotePopover } from './FieldNotePopover';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -103,6 +104,9 @@ export function DiagramCanvas() {
   const [arrangeOpen, setArrangeOpen] = useState(false);
   const [settingsTableId, setSettingsTableId] = useState<string | null>(null);
   const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null);
+  const [fieldNoteTarget, setFieldNoteTarget] = useState<{ tableId: string; fieldName: string } | null>(null);
+  const openFieldNote = useCallback((tableId: string, fieldName: string) => setFieldNoteTarget({ tableId, fieldName }), []);
+  const closeFieldNote = useCallback(() => setFieldNoteTarget(null), []);
   const [searchOpen, setSearchOpen] = useState(false);
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
@@ -825,6 +829,7 @@ export function DiagramCanvas() {
                 onHover={setHoveredTable}
                 onFieldHover={setHoveredField}
                 hotFields={hotFieldsByTable?.get(t.id) ?? null}
+                onEditFieldNote={openFieldNote}
                 focused={t.id === editorFocusTableId}
                 selected={selectedSet.has(t.id)}
                 dimmed={keepSet !== null && !keepSet.has(t.id)}
@@ -883,6 +888,7 @@ export function DiagramCanvas() {
       <CanvasControls onOpenSearch={openSearch} />
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
+      {fieldNoteTarget && <FieldNotePopover tableId={fieldNoteTarget.tableId} fieldName={fieldNoteTarget.fieldName} onClose={closeFieldNote} />}
       {edgePopover && (
         <EdgeRefPopover refId={edgePopover.refId} x={edgePopover.x} y={edgePopover.y} onClose={closeEdgePopover} />
       )}
