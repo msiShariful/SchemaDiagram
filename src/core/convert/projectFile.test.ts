@@ -168,3 +168,26 @@ describe('collapsedGroupIds (Plan 7, optional — backward compatible)', () => {
     expect(parseProject(JSON.stringify(raw)).ok).toBe(false);
   });
 });
+
+describe('noteColors (optional — backward compatible)', () => {
+  it('round-trips, omits when empty, and rejects malformed values', () => {
+    const base = { name: 'n', dbml: 'Table t { id int }', positions: {}, viewport: { x: 0, y: 0, zoom: 1 } };
+    const out = serializeProject({ ...base, noteColors: { memo: '#cfe5ff' } });
+    const r = parseProject(out);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.project.noteColors).toEqual({ memo: '#cfe5ff' });
+    // empty map omitted from the file
+    expect(JSON.parse(serializeProject({ ...base, noteColors: {} }))).not.toHaveProperty('noteColors');
+    // absent stays valid (older files)
+    const legacy = parseProject(serializeProject(base));
+    if (!legacy.ok) throw new Error(legacy.error);
+    expect(legacy.project.noteColors).toBeUndefined();
+    // trust boundary: non-hex values rejected
+    const bad = JSON.parse(out);
+    bad.noteColors = { memo: 'javascript:alert(1)' };
+    expect(parseProject(JSON.stringify(bad)).ok).toBe(false);
+    const badType = JSON.parse(out);
+    badType.noteColors = ['#cfe5ff'];
+    expect(parseProject(JSON.stringify(badType)).ok).toBe(false);
+  });
+});

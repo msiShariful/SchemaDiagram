@@ -11,6 +11,7 @@ export interface ProjectFile {
   dbml: string;
   layout: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
+  noteColors?: Record<string, string>; // optional: sticky-note tints (view state, like notePositions)
   hiddenTableIds?: string[]; // optional: pre-Plan-6 files lack it (Feature D view state)
   collapsedGroupIds?: string[]; // optional: pre-Plan-7 files lack it (group-collapse view state)
   viewport: Viewport;
@@ -25,6 +26,7 @@ export function serializeProject(p: {
   dbml: string;
   positions: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
+  noteColors?: Record<string, string>; // optional: sticky-note tints (view state, like notePositions)
   hiddenTableIds?: string[];
   collapsedGroupIds?: string[];
   viewport: Viewport;
@@ -35,6 +37,7 @@ export function serializeProject(p: {
     dbml: p.dbml,
     layout: p.positions,
     notePositions: p.notePositions,
+    noteColors: p.noteColors && Object.keys(p.noteColors).length > 0 ? p.noteColors : undefined,
     hiddenTableIds: p.hiddenTableIds && p.hiddenTableIds.length > 0 ? p.hiddenTableIds : undefined,
     collapsedGroupIds: p.collapsedGroupIds && p.collapsedGroupIds.length > 0 ? p.collapsedGroupIds : undefined,
     viewport: p.viewport,
@@ -99,6 +102,24 @@ export function parseProject(text: string): ProjectParseResult {
     if (!notePositionsResult.ok) return notePositionsResult;
     notePositions = notePositionsResult.value;
   }
+  // noteColors is optional. Trust boundary: an object map whose values are
+  // #RRGGBB strings — reserved keys are harmless here (values are copied
+  // into a fresh object, and note ids are matched against parsed notes).
+  let noteColors: Record<string, string> | undefined;
+  if (o.noteColors !== undefined) {
+    const m = o.noteColors;
+    if (typeof m !== 'object' || m === null || Array.isArray(m)) {
+      return { ok: false, error: 'Project file "noteColors" must be an object map.' };
+    }
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(m)) {
+      if (typeof v !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v)) {
+        return { ok: false, error: 'Project file "noteColors" values must be #RRGGBB strings.' };
+      }
+      out[k] = v;
+    }
+    noteColors = out;
+  }
   // hiddenTableIds is optional (pre-Plan-6 files). It is a plain string
   // array — no reserved-key hazard (that only exists for object maps) — so
   // the trust boundary is: array, all entries strings.
@@ -132,6 +153,7 @@ export function parseProject(text: string): ProjectParseResult {
       dbml: o.dbml,
       layout: layoutResult.value,
       ...(notePositions !== undefined ? { notePositions } : {}),
+      ...(noteColors !== undefined ? { noteColors } : {}),
       ...(hiddenTableIds !== undefined ? { hiddenTableIds } : {}),
       ...(collapsedGroupIds !== undefined ? { collapsedGroupIds } : {}),
       viewport: { x: vp.x, y: vp.y, zoom: vp.zoom },

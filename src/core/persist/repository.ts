@@ -6,7 +6,8 @@ export interface PersistedDiagram {
   name: string;
   dbml: string;
   positions: Record<string, TablePosition>;
-  notePositions?: Record<string, TablePosition>; // optional: pre-Plan-3 records lack it
+  notePositions?: Record<string, TablePosition>;
+  noteColors?: Record<string, string>; // optional: pre-Plan-3 records lack it
   hiddenTableIds?: string[]; // optional: pre-Plan-6 records lack it (view state, Feature D)
   collapsedGroupIds?: string[]; // optional: pre-Plan-7 records lack it (view state, group collapse)
   viewport: Viewport;
@@ -22,7 +23,8 @@ export interface DiagramSnapshot {
   name: string;
   dbml: string;
   positions: Record<string, TablePosition>;
-  notePositions?: Record<string, TablePosition>; // optional: pre-Plan-3 rows lack it
+  notePositions?: Record<string, TablePosition>;
+  noteColors?: Record<string, string>; // optional: pre-Plan-3 rows lack it
   hiddenTableIds?: string[]; // optional: pre-Plan-6 rows lack it
   collapsedGroupIds?: string[]; // optional: pre-Plan-7 rows lack it (view state, group collapse)
   viewport: Viewport;

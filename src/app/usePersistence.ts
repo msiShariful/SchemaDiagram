@@ -27,7 +27,7 @@ function currentRecord(): DiagramRecord | null {
   if (!s.diagramId) return null;
   return {
     id: s.diagramId, name: s.diagramName, dbml: s.source,
-    positions: s.positions, notePositions: s.notePositions,
+    positions: s.positions, notePositions: s.notePositions, noteColors: s.noteColors,
     hiddenTableIds: s.hiddenTableIds,
     collapsedGroupIds: s.collapsedGroupIds,
     viewport: s.viewport, updatedAt: Date.now(),
@@ -57,6 +57,7 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
     const sameLayout = !compareLayout || (
       JSON.stringify(newest?.positions) === JSON.stringify(rec.positions) &&
       JSON.stringify(newest?.notePositions) === JSON.stringify(rec.notePositions) &&
+      JSON.stringify(newest?.noteColors ?? {}) === JSON.stringify(rec.noteColors ?? {}) &&
       JSON.stringify(newest?.viewport) === JSON.stringify(rec.viewport) &&
       // ?? [] on BOTH sides: a pre-Plan-6 snapshot (undefined) must equal a
       // live [] — otherwise the first restore after upgrade writes a
@@ -74,6 +75,7 @@ async function snapshotIfChanged(rec: DiagramRecord, compareLayout: boolean): Pr
       dbml: rec.dbml,
       positions: rec.positions,
       notePositions: rec.notePositions,
+      noteColors: rec.noteColors,
       hiddenTableIds: rec.hiddenTableIds,
       collapsedGroupIds: rec.collapsedGroupIds,
       viewport: rec.viewport,
@@ -245,6 +247,7 @@ export interface ImportedDiagram {
   dbml: string;
   positions?: Record<string, TablePosition>;
   notePositions?: Record<string, TablePosition>;
+  noteColors?: Record<string, string>;
   hiddenTableIds?: string[];
   collapsedGroupIds?: string[];
   viewport?: Viewport;
@@ -263,6 +266,7 @@ export async function importDiagram(imp: ImportedDiagram): Promise<void> {
     dbml: imp.dbml,
     positions: imp.positions ?? {},
     notePositions: imp.notePositions ?? {},
+    noteColors: imp.noteColors ?? {},
     hiddenTableIds: imp.hiddenTableIds ?? [],
     collapsedGroupIds: imp.collapsedGroupIds ?? [],
     viewport: imp.viewport ?? { x: 40, y: 40, zoom: 1 },
@@ -287,7 +291,7 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
   await snapshotIfChanged(cur, true);
   const rec: DiagramRecord = {
     id: cur.id, name: snap.name, dbml: snap.dbml,
-    positions: snap.positions, notePositions: snap.notePositions ?? {},
+    positions: snap.positions, notePositions: snap.notePositions ?? {}, noteColors: snap.noteColors ?? {},
     hiddenTableIds: snap.hiddenTableIds ?? [],
     collapsedGroupIds: snap.collapsedGroupIds ?? [],
     viewport: snap.viewport, updatedAt: Date.now(),
@@ -311,7 +315,7 @@ export async function restoreSnapshot(snap: DiagramSnapshot): Promise<void> {
     // which autosave would then persist.
     resetCanvasStack();
     useAppStore.setState({
-      diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions,
+      diagramName: rec.name, positions: rec.positions, notePositions: rec.notePositions, noteColors: rec.noteColors ?? {},
       hiddenTableIds: rec.hiddenTableIds, collapsedGroupIds: rec.collapsedGroupIds, viewport: rec.viewport,
       canvasStackVersion: useAppStore.getState().canvasStackVersion + 1, // resetCanvasStack() just ran
     });
@@ -341,7 +345,7 @@ export function usePersistence(): void {
     })();
 
     const unsub = useAppStore.subscribe(
-      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions, s.hiddenTableIds, s.collapsedGroupIds] as const,
+      (s) => [s.source, s.positions, s.viewport, s.diagramName, s.notePositions, s.noteColors, s.hiddenTableIds, s.collapsedGroupIds] as const,
       () => scheduleAutosave(),
       { equalityFn: (a, b) => a.every((v, i) => Object.is(v, b[i])) },
     );

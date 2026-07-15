@@ -115,6 +115,8 @@ export function DiagramCanvas() {
   const schema = useAppStore((s) => s.schema);
   const positions = useAppStore((s) => s.positions);
   const notePositions = useAppStore((s) => s.notePositions);
+  const noteColors = useAppStore((s) => s.noteColors);
+  const setNoteColor = useAppStore((s) => s.setNoteColor);
   const setHoveredTable = useAppStore((s) => s.setHoveredTable);
   const setHoveredField = useAppStore((s) => s.setHoveredField);
   // Edge-hover -> tint BOTH endpoint field rows. hoveredRefId changes only on
@@ -843,7 +845,7 @@ export function DiagramCanvas() {
             // holds pointer capture would strand the drag with no pointerup.
             const isDragAnchor = noteDragRef.current === n.id;
             if (viewRect && !isDragAnchor && !rectsOverlap(getNoteRect(pos), viewRect)) return null;
-            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} dragLedger={noteDragRef} onCommitMove={handleNoteCommit} />;
+            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} dragLedger={noteDragRef} onCommitMove={handleNoteCommit} color={noteColors[n.id] ?? null} onSetColor={setNoteColor} />;
           })}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />

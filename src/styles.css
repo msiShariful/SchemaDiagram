@@ -514,3 +514,14 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
 
 /* Relationship hover: the hovered edge's endpoint rows tint in both tables. */
 .field-row.hot > rect:first-of-type { fill: var(--selection-bg); }
+
+/* Sticky-note colors (dbdiagram parity): hover palette along the bottom
+   edge; colored notes force dark text — fixed pastels stay light in dark
+   theme, where var(--text) would wash out. */
+.note-swatches { opacity: 0; transition: opacity 0.12s ease; cursor: pointer; }
+.sticky-note:hover .note-swatches { opacity: 1; }
+.note-swatches circle:hover { stroke-width: 2; }
+.note-swatch-reset circle { fill: var(--bg-elev); stroke: var(--border); }
+.note-swatch-reset text { font-size: 8px; fill: var(--text-dim); user-select: none; }
+.sticky-note.colored .note-title { fill: #2f3237; }
+.sticky-note.colored .note-content { color: #2f3237; }

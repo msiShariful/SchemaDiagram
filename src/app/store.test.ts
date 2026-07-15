@@ -382,6 +382,26 @@ describe('view state (Plan 6): hiddenTableIds, session flags, createdAt', () => 
     expect(useAppStore.getState().diagramCreatedAt).toBeNull();
   });
 
+  it('noteColors: set/clear, pruned to surviving notes on parse, loaded with ?? {} default', () => {
+    const both = "Table t { id int }\nNote a { 'x' }\nNote b { 'y' }";
+    useAppStore.getState().applyParse(parseDbml(both), both);
+    const [na, nb] = useAppStore.getState().schema.notes.map((n) => n.id);
+    useAppStore.getState().setNoteColor(na, '#cfe5ff');
+    useAppStore.getState().setNoteColor(nb, '#ffd6e4');
+    expect(useAppStore.getState().noteColors).toEqual({ [na]: '#cfe5ff', [nb]: '#ffd6e4' });
+    useAppStore.getState().setNoteColor(nb, null);
+    expect(useAppStore.getState().noteColors).toEqual({ [na]: '#cfe5ff' });
+    // note b removed from the text: color for a survives, ghost keys never linger
+    const onlyA = "Table t { id int }\nNote a { 'x' }";
+    useAppStore.getState().applyParse(parseDbml(onlyA), onlyA);
+    expect(useAppStore.getState().noteColors).toEqual({ [na]: '#cfe5ff' });
+    // pre-noteColors record loads with the default
+    useAppStore.getState().loadDiagram({
+      id: 'z', name: 'Z', dbml: '', positions: {}, viewport: { x: 0, y: 0, zoom: 1 }, updatedAt: 1,
+    });
+    expect(useAppStore.getState().noteColors).toEqual({});
+  });
+
   it('loadDiagram does NOT touch snapEnabled/lodOverride/panMode (session state)', () => {
     useAppStore.getState().setSnapEnabled(false);
     useAppStore.getState().setLodOverride('boxes');

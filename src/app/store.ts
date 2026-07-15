@@ -79,6 +79,7 @@ interface AppState {
   storageUnavailable: boolean;
   parsedSource: string | null;
   notePositions: Record<string, TablePosition>;
+  noteColors: Record<string, string>; // sticky-note tint — LAYOUT state like notePositions, never DBML
   selectedTableIds: string[];
   hiddenTableIds: string[]; // view state: tables hidden from the canvas (Feature D) — layout-side, never DBML
   diagramCreatedAt: number | null; // mirrors PersistedDiagram.createdAt so autosave round-trips it
@@ -102,6 +103,7 @@ interface AppState {
   setHiddenTables(ids: string[]): void;
   setSnapEnabled(v: boolean): void;
   setPanMode(v: boolean): void;
+  setNoteColor(noteId: string, color: string | null): void;
   setLodOverride(v: LodOverride): void;
   setTraceEnabled(v: boolean): void;
   setHighlightTable(id: string | null): void;
@@ -129,6 +131,7 @@ export const useAppStore = create<AppState>()(
     storageUnavailable: false,
     parsedSource: null,
     notePositions: {},
+    noteColors: {},
     selectedTableIds: [],
     hiddenTableIds: [],
     diagramCreatedAt: null,
@@ -147,13 +150,15 @@ export const useAppStore = create<AppState>()(
         set({ errors: result.errors, stale: true });
         return;
       }
-      const { schema: prev, positions, notePositions, selectedTableIds, hiddenTableIds, collapsedGroupIds, highlightTableId } = get();
+      const { schema: prev, positions, notePositions, noteColors, selectedTableIds, hiddenTableIds, collapsedGroupIds, highlightTableId } = get();
       const kept = reconcilePositions(prev, result.schema, positions);
       const placed = placeNewTables(result.schema, kept);
       const nextPositions = { ...kept, ...placed };
       const keptNotes: Record<string, TablePosition> = {};
+      const keptColors: Record<string, string> = {};
       for (const n of result.schema.notes) {
         if (Object.hasOwn(notePositions, n.id)) keptNotes[n.id] = notePositions[n.id];
+        if (Object.hasOwn(noteColors, n.id)) keptColors[n.id] = noteColors[n.id];
       }
       const occupied = result.schema.tables
         .filter((t) => nextPositions[t.id])
@@ -164,6 +169,7 @@ export const useAppStore = create<AppState>()(
         schema: result.schema,
         positions: nextPositions,
         notePositions: { ...keptNotes, ...placedNotes },
+        noteColors: keptColors,
         selectedTableIds: selectedTableIds.filter((id) => tableIds.has(id)),
         hiddenTableIds: hiddenTableIds.filter((id) => tableIds.has(id)),
         collapsedGroupIds: (() => {
@@ -224,6 +230,13 @@ export const useAppStore = create<AppState>()(
       }),
     setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
     setPanMode: (panMode) => set({ panMode }),
+    setNoteColor: (noteId, color) =>
+      set((s) => {
+        const next = { ...s.noteColors };
+        if (color === null) delete next[noteId];
+        else next[noteId] = color;
+        return { noteColors: next };
+      }),
     setLodOverride: (lodOverride) => set({ lodOverride }),
     setTraceEnabled: (traceEnabled) =>
       set((s) => ({ traceEnabled, highlightTableId: traceEnabled ? s.highlightTableId : null })),
@@ -265,6 +278,7 @@ export const useAppStore = create<AppState>()(
         hiddenTableIds: rec.hiddenTableIds ?? [], // pre-Plan-6 records: nothing hidden
         diagramCreatedAt: rec.createdAt ?? null,
         collapsedGroupIds: rec.collapsedGroupIds ?? [], // pre-Plan-7 records: nothing collapsed
+        noteColors: rec.noteColors ?? {}, // pre-note-color records: default tint
         highlightTableId: null, // it named a table of the OLD diagram
         canvasStackVersion: s.canvasStackVersion + 1, // resetCanvasStack() above emptied the stack — buttons must re-read
         // traceEnabled / snapEnabled / panMode / lodOverride deliberately untouched: session state.

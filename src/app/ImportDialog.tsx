@@ -73,6 +73,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           dbml: r.project.dbml,
           positions: r.project.layout,
           notePositions: r.project.notePositions,
+          noteColors: r.project.noteColors,
           hiddenTableIds: r.project.hiddenTableIds,
           collapsedGroupIds: r.project.collapsedGroupIds,
           viewport: r.project.viewport,
