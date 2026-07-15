@@ -3,6 +3,7 @@ import { useAppStore } from '../app/store';
 import { computeGroupRect, GROUP_HEADER_HEIGHT, GROUP_PILL_W, GROUP_PILL_H } from '../core/layout/groups';
 import { effectiveHiddenIds, omitHidden } from '../core/model/visibility';
 import type { TablePosition } from '../core/model/types';
+import { DRAG_THRESHOLD_PX } from './snap';
 
 interface Props {
   zoomRef: React.RefObject<number>;
@@ -18,6 +19,8 @@ interface GroupDrag {
   dx: number;
   dy: number;
   el: SVGGElement; // the whole group <g>, moved live so rect+header track the drag
+  moved: boolean; // raw pointer travel exceeded DRAG_THRESHOLD_PX (parity with tables/notes)
+  onTap: (() => void) | null; // fired on release when the gesture stayed a click (pill -> expand)
 }
 
 export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onCommitMoveSet }: Props) {
@@ -49,7 +52,7 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
     );
   };
 
-  const startDrag = (memberIds: string[]) => (e: React.PointerEvent<SVGGElement>) => {
+  const startDrag = (memberIds: string[], onTap: (() => void) | null = null) => (e: React.PointerEvent<SVGGElement>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
@@ -64,6 +67,8 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
       dx: 0,
       dy: 0,
       el: e.currentTarget.parentNode as SVGGElement,
+      moved: false,
+      onTap,
     };
   };
   const onPointerMove = (e: React.PointerEvent<SVGGElement>) => {
@@ -77,6 +82,12 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
     // below covers the capture-loss case; this covers capture events that never
     // reach the detached element's listener.
     if (e.buttons === 0) { drag.current = null; return; }
+    if (!d.moved) {
+      // Same 3 px click-jitter guard as table/note drags — and what makes
+      // tap-to-expand on the pill reliable.
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < DRAG_THRESHOLD_PX) return;
+      d.moved = true;
+    }
     const zoom = zoomRef.current ?? 1;
     d.dx = (e.clientX - d.startX) / zoom;
     d.dy = (e.clientY - d.startY) / zoom;
@@ -88,6 +99,10 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
     if (!d) return;
     drag.current = null;
     d.el.removeAttribute('transform');
+    if (!d.moved) {
+      d.onTap?.(); // click, not a drag — pill tap expands
+      return;
+    }
     onCommitMoveSet(d.memberIds, d.base, d.dx, d.dy, 'move group');
   };
 
@@ -103,12 +118,13 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
             <g key={g.id} className="table-group collapsed">
               <g
                 className="group-header"
-                onPointerDown={startDrag(g.tableIds)}
+                onPointerDown={startDrag(g.tableIds, () => toggleCollapse(g.id))}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
                 onLostPointerCapture={onPointerUp}
               >
+                <title>Click to expand — drag to move the group</title>
                 <rect className="group-pill" x={rect.x} y={rect.y} width={GROUP_PILL_W} height={GROUP_PILL_H} rx={8} stroke={color} fill={color} />
                 <text x={rect.x + 30} y={rect.y + GROUP_PILL_H / 2} dominantBaseline="central" className="group-title">
                   {g.name} ({g.tableIds.length})
@@ -119,7 +135,8 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => toggleCollapse(g.id)}
               >
-                <rect x={rect.x + 6} y={rect.y + GROUP_PILL_H / 2 - 8} width={16} height={16} rx={3} className="group-collapse-bg" />
+                <title>Expand group</title>
+                <rect x={rect.x + 5} y={rect.y + GROUP_PILL_H / 2 - 9} width={18} height={18} rx={4} className="group-collapse-bg" />
                 <text x={rect.x + 14} y={rect.y + GROUP_PILL_H / 2} textAnchor="middle" dominantBaseline="central" className="group-collapse-glyph">▸</text>
               </g>
             </g>
@@ -147,8 +164,9 @@ export const GroupLayer = memo(function GroupLayer({ zoomRef, onLiveMoveSet, onC
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => toggleCollapse(g.id)}
             >
-              <rect x={rect.x + rect.w - 22} y={rect.y + GROUP_HEADER_HEIGHT / 2 - 8} width={16} height={16} rx={3} className="group-collapse-bg" />
-              <text x={rect.x + rect.w - 14} y={rect.y + GROUP_HEADER_HEIGHT / 2} textAnchor="middle" dominantBaseline="central" className="group-collapse-glyph">▾</text>
+              <title>Collapse group</title>
+              <rect x={rect.x + rect.w - 24} y={rect.y + GROUP_HEADER_HEIGHT / 2 - 9} width={18} height={18} rx={4} className="group-collapse-bg" />
+              <text x={rect.x + rect.w - 15} y={rect.y + GROUP_HEADER_HEIGHT / 2} textAnchor="middle" dominantBaseline="central" className="group-collapse-glyph">▾</text>
             </g>
           </g>
         );
