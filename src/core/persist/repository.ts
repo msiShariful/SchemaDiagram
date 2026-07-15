@@ -34,7 +34,7 @@ export interface DiagramSnapshot {
 
 export const SNAPSHOT_LIMIT = 20;
 
-const DB_NAME = 'dbdraft';
+const DB_NAME = 'dbdraft'; // pre-rename identifier ON PURPOSE: changing it orphans every existing saved diagram
 const DB_VERSION = 2; // v1: diagrams. v2: + snapshots (keyPath id, index byDiagram).
 const STORE = 'diagrams';
 const SNAPSHOTS = 'snapshots';

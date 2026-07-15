@@ -15,14 +15,16 @@ import { downloadText } from './export/download';
 import { safeFilename } from './export/exportCss';
 import { CanvasErrorBoundary } from './CanvasErrorBoundary';
 
-const THEME_KEY = 'dbdraft.theme'; // keep in sync with the inline FOUC guard in index.html
+const THEME_KEY = 'schemadiagram.theme'; // keep in sync with the inline FOUC guard in index.html
+const LEGACY_THEME_KEY = 'dbdraft.theme'; // pre-rename installs (read-only fallback)
 type Theme = 'light' | 'dark';
 
 // Best-effort persistence — the app must never break because localStorage
 // is unavailable or full (same contract as SplitPane's readSplit/writeSplit).
 function readTheme(): Theme {
   try {
-    return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light';
+    const stored = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
+    return stored === 'dark' ? 'dark' : 'light';
   } catch {
     return 'light';
   }
@@ -53,7 +55,7 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="toolbar">
-        <span className="brand">DBDraft</span>
+        <span className="brand">SchemaDiagram</span>
         <DiagramManager />
         <button onClick={() => setImportOpen(true)}>Import</button>
         <button

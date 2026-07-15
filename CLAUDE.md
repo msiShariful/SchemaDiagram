@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Local-first dbdiagram.io clone: DBML text on the left, live ER diagram on the right. React 19 + TypeScript (strict) + Vite, zustand, CodeMirror 6, `@dbml/core`, custom SVG canvas, IndexedDB. No backend.
+SchemaDiagram — a local-first dbdiagram.io-style editor: DBML text on the left, live ER diagram on the right. React 19 + TypeScript (strict) + Vite, zustand, CodeMirror 6, `@dbml/core`, custom SVG canvas, IndexedDB. No backend.
 
 Design spec lives in `docs/superpowers/specs/`, per-milestone implementation plans in `docs/superpowers/plans/`. Milestones are tagged `plan-N-complete`. All seven milestones are complete (Plan 7: completeness — ref authoring from the canvas via the text bridge, field badges/tooltips, highlight mode, Cmd/Ctrl+K quick-search, group collapse, escape overlay-stack, toolbar undo/redo, sample diagram, print-to-PDF, Snowflake import). Regression guards: `npm test` (vitest units), `npm run test:e2e` (Playwright golden flows + perf budget), `npm run check:bundle` (main-chunk gzip budget + lazy-lib leak markers).
 

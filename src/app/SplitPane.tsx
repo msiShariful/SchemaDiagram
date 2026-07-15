@@ -1,12 +1,13 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
-const KEY = 'dbdraft.split';
+const KEY = 'schemadiagram.split';
+const LEGACY_KEY = 'dbdraft.split'; // pre-rename installs (read-only fallback)
 
 // Storage persistence of the split ratio is best-effort: the app must never
 // break (or leak listeners) because localStorage is unavailable or full.
 function readSplit(): number {
   try {
-    const n = Number(localStorage.getItem(KEY));
+    const n = Number(localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY));
     return n >= 15 && n <= 80 ? n : 38;
   } catch {
     return 38;
