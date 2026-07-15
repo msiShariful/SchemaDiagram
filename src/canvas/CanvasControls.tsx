@@ -18,7 +18,7 @@ const SHORTCUTS: Array<[string, string]> = [
 /** Bottom-left control cluster (Feature E). snapEnabled/lodOverride are
  *  SESSION state: not persisted, untouched by diagram switches (documented
  *  plan choice — workbench preferences, not document state). */
-export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
+export function CanvasControls({ onOpenSearch, onAddNote }: { onOpenSearch: () => void; onAddNote: () => void }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const snapEnabled = useAppStore((s) => s.snapEnabled);
   const setSnapEnabled = useAppStore((s) => s.setSnapEnabled);
@@ -65,6 +65,12 @@ export function CanvasControls({ onOpenSearch }: { onOpenSearch: () => void }) {
         onClick={() => setShortcutsOpen((v) => !v)}
       >
         ?
+      </button>
+      <button aria-label="Add sticky note" data-tip="Add a sticky note" onClick={onAddNote}>
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M2.5 2.5h11v7l-4 4h-7z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+          <path d="M9.5 13.5v-4h4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        </svg>
       </button>
       <button
         aria-pressed={snapEnabled}

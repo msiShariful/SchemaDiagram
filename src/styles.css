@@ -566,3 +566,21 @@ body { font-family: system-ui, sans-serif; color: var(--text); background: var(-
   display: flex; align-items: center; justify-content: center; padding: 0;
 }
 .color-strip .cs-clear:hover, .color-strip .cs-more:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Note authoring: sticky content editor + table-note field. */
+.note-edit-pop {
+  position: absolute; z-index: 30; width: min(300px, calc(100cqw - 24px));
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); padding: 10px; font-size: 12px;
+}
+.nep-area, .ts-note {
+  width: 100%; font-size: 12px; padding: 5px 7px; border: 1px solid var(--border);
+  border-radius: 5px; background: var(--bg); color: var(--text); resize: vertical;
+  font-family: inherit; box-sizing: border-box;
+}
+.nep-hint { color: var(--text-dim); font-size: 11px; margin-left: auto; align-self: center; }
+.ts-note { margin-top: 2px; }
+.ts-note-save {
+  margin-top: 6px; font-size: 12px; padding: 4px 10px; border: 1px solid var(--border);
+  background: var(--bg-elev); color: var(--text); border-radius: 5px; cursor: pointer;
+}

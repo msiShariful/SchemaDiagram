@@ -5,6 +5,7 @@ import { formatDbmlSource } from '../core/format/formatDbml';
 import { useAppStore } from '../app/store';
 import { rewriteTableHeader, type TableHeaderEdit } from './tableSettings';
 import { buildFieldNoteSplice } from './fieldNote';
+import { buildTableNoteSplice, buildStickyNoteSplice } from './noteEdit';
 import { findRefLine, MIRRORED, type RefOperator } from './refEdit';
 import type { Ref } from '../core/model/types';
 
@@ -103,6 +104,46 @@ export function applyFieldNote(tableId: string, fieldName: string, note: string 
   view.dispatch({
     changes: { from: splice.from, to: splice.to, insert: splice.insert },
     userEvent: 'canvas.settings',
+  });
+  return true;
+}
+
+/** Canvas→text bridge: set/replace/remove a table's body Note line. */
+export function applyTableNote(tableId: string, note: string | null): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const splice = buildTableNoteSplice(view.state.doc.toString(), tableId, note);
+  if (splice === null) return false;
+  if (splice.from === splice.to && splice.insert === '') return true; // no-op
+  view.dispatch({
+    changes: { from: splice.from, to: splice.to, insert: splice.insert },
+    userEvent: 'canvas.settings',
+  });
+  return true;
+}
+
+/** Canvas→text bridge: replace a sticky note block's content string. */
+export function applyStickyNote(noteName: string, content: string): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const splice = buildStickyNoteSplice(view.state.doc.toString(), noteName, content);
+  if (splice === null) return false;
+  view.dispatch({
+    changes: { from: splice.from, to: splice.to, insert: splice.insert },
+    userEvent: 'canvas.note',
+  });
+  return true;
+}
+
+/** Canvas→text bridge: append a whole block (new sticky note) at doc end. */
+export function appendBlock(block: string): boolean {
+  const view = currentView;
+  if (!view) return false;
+  const len = view.state.doc.length;
+  const prefix = len === 0 ? '' : view.state.doc.sliceString(len - 1, len) === '\n' ? '\n' : '\n\n';
+  view.dispatch({
+    changes: { from: len, insert: `${prefix}${block}\n` },
+    userEvent: 'canvas.note',
   });
   return true;
 }

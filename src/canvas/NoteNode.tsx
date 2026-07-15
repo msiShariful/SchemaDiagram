@@ -14,6 +14,7 @@ interface Props {
   onCommitMove: (id: string, before: TablePosition, after: TablePosition) => void;
   color: string | null; // stored tint (noteColors) — null = theme default
   onSetColor: (id: string, color: string | null) => void; // stable store action (memo contract)
+  onEditNote: (id: string) => void; // stable (memo contract) — double-click opens the content editor
 }
 
 /** dbdiagram-ish sticky palette: pastel fill + matching darker border.
@@ -29,7 +30,7 @@ export const NOTE_SWATCHES: Array<{ bg: string; border: string }> = [
   { bg: '#e8eaee', border: '#a9b0bb' }, // gray
 ];
 
-export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, dragLedger, onCommitMove, color, onSetColor }: Props) {
+export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, dragLedger, onCommitMove, color, onSetColor, onEditNote }: Props) {
   const gRef = useRef<SVGGElement>(null);
   const drag = useRef<{
     startX: number;
@@ -82,6 +83,7 @@ export const NoteNode = memo(function NoteNode({ note, pos, zoomRef, dragLedger,
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onLostPointerCapture={onPointerUp}
+      onDoubleClick={() => onEditNote(note.id)}
     >
       <rect
         width={NOTE_WIDTH}

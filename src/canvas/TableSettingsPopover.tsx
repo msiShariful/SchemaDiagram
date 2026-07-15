@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../app/store';
-import { applyTableSettings } from '../editor/editorNav';
+import { applyTableSettings, applyTableNote } from '../editor/editorNav';
 import { HEX_COLOR_RE } from '../editor/tableSettings';
 import { TABLE_WIDTH } from '../core/model/geometry';
 import { useOverlayEscape } from '../app/overlayStack';
@@ -28,6 +28,7 @@ export function TableSettingsPopover({ tableId, onClose }: Props) {
   const viewport = useAppStore((s) => s.viewport);
   const [name, setName] = useState(() => table?.name ?? '');
   const [hex, setHex] = useState('');
+  const [noteText, setNoteText] = useState(() => table?.note ?? '');
   const [err, setErr] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -53,6 +54,11 @@ export function TableSettingsPopover({ tableId, onClose }: Props) {
 
   const setColor = (color: string | null) => {
     setErr(applyTableSettings(tableId, { headerColor: color }) ? null : 'Could not edit this table header.');
+  };
+  const saveNote = () => {
+    const next = noteText.trim();
+    const ok = applyTableNote(tableId, next === '' ? null : next);
+    setErr(ok ? null : 'This note lives in the table header settings — edit it in the DBML.');
   };
   const rename = () => {
     const next = name.trim();
@@ -126,6 +132,18 @@ export function TableSettingsPopover({ tableId, onClose }: Props) {
         />
         <button onClick={applyHex}>Set</button>
       </div>
+      <div className="ts-label">Table Note</div>
+      <textarea
+        className="ts-note"
+        rows={2}
+        placeholder="Shown in the header tooltip"
+        value={noteText}
+        onChange={(e) => {
+          setNoteText(e.target.value);
+          setErr(null);
+        }}
+      />
+      <button className="ts-note-save" onClick={saveNote}>Save note</button>
       {err && <div className="ts-error">{err}</div>}
     </div>
   );

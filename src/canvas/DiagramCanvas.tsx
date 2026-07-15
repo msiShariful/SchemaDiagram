@@ -9,6 +9,7 @@ import { EdgeRefPopover } from './EdgeRefPopover';
 import { QuickSearch } from './QuickSearch';
 import { FieldNotePopover } from './FieldNotePopover';
 import { TableColorStrip } from './TableColorStrip';
+import { NoteEditPopover } from './NoteEditPopover';
 import { NoteNode } from './NoteNode';
 import { zoomAt } from './viewport';
 import { fitViewport } from './fitView';
@@ -19,7 +20,7 @@ import { CanvasControls } from './CanvasControls';
 import { ArrangeMenu } from './ArrangeMenu';
 import { visibleWorldRect } from './culling';
 import { getTableRect, getNoteRect, rectsOverlap, TABLE_WIDTH, tableHeight, fieldRowY } from '../core/model/geometry';
-import { revealTable, appendRefLine } from '../editor/editorNav';
+import { revealTable, appendRefLine, appendBlock } from '../editor/editorNav';
 import { runElkLayout } from '../core/layout/elkLayout';
 import type { ArrangeAlgorithm } from '../core/layout/elkGraph';
 import type { PositionDelta } from '../core/layout/commands';
@@ -30,6 +31,7 @@ import { visibleTableRects, effectiveHiddenIds } from '../core/model/visibility'
 import { overlayDepth } from '../app/overlayStack';
 import { fieldDropTarget, isDuplicateRef, type DropField } from './refDrag';
 import { buildRefLine } from '../editor/refEdit';
+import { buildNewNoteBlock } from '../editor/noteEdit';
 
 // Gesture ledger rules — shared by every per-schema-object drag on the canvas
 // (table, note, group; the minimap's viewport drag doesn't carry a
@@ -107,6 +109,13 @@ export function DiagramCanvas() {
   const [edgePopover, setEdgePopover] = useState<{ refId: string; x: number; y: number } | null>(null);
   const [fieldNoteTarget, setFieldNoteTarget] = useState<{ tableId: string; fieldName: string } | null>(null);
   const openFieldNote = useCallback((tableId: string, fieldName: string) => setFieldNoteTarget({ tableId, fieldName }), []);
+  const [editNoteId, setEditNoteId] = useState<string | null>(null);
+  const openNoteEdit = useCallback((id: string) => setEditNoteId(id), []);
+  const closeNoteEdit = useCallback(() => setEditNoteId(null), []);
+  const addStickyNote = useCallback(() => {
+    const names = useAppStore.getState().schema.notes.map((n) => n.name);
+    appendBlock(buildNewNoteBlock(names).block); // placeNewNotes positions it after the parse
+  }, []);
   const closeFieldNote = useCallback(() => setFieldNoteTarget(null), []);
   const [searchOpen, setSearchOpen] = useState(false);
   const openSearch = useCallback(() => setSearchOpen(true), []);
@@ -875,7 +884,7 @@ export function DiagramCanvas() {
             // holds pointer capture would strand the drag with no pointerup.
             const isDragAnchor = noteDragRef.current === n.id;
             if (viewRect && !isDragAnchor && !rectsOverlap(getNoteRect(pos), viewRect)) return null;
-            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} dragLedger={noteDragRef} onCommitMove={handleNoteCommit} color={noteColors[n.id] ?? null} onSetColor={setNoteColor} />;
+            return <NoteNode key={n.id} note={n} pos={pos} zoomRef={zoomRef} dragLedger={noteDragRef} onCommitMove={handleNoteCommit} color={noteColors[n.id] ?? null} onSetColor={setNoteColor} onEditNote={openNoteEdit} />;
           })}
           <line ref={guideXRef} className="guide" y1={-100000} y2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
           <line ref={guideYRef} className="guide" x1={-100000} x2={100000} visibility="hidden" vectorEffect="non-scaling-stroke" />
@@ -910,10 +919,11 @@ export function DiagramCanvas() {
         </button>
         {arrangeOpen && <ArrangeMenu onPick={(a) => void autoLayout(a)} onClose={() => setArrangeOpen(false)} />}
       </div>
-      <CanvasControls onOpenSearch={openSearch} />
+      <CanvasControls onOpenSearch={openSearch} onAddNote={addStickyNote} />
       <DiagramViewsSidebar expanded={viewsOpen} setExpanded={setViewsOpen} />
       {settingsTableId && <TableSettingsPopover tableId={settingsTableId} onClose={closeSettings} />}
       {fieldNoteTarget && <FieldNotePopover tableId={fieldNoteTarget.tableId} fieldName={fieldNoteTarget.fieldName} onClose={closeFieldNote} />}
+      {editNoteId && <NoteEditPopover noteId={editNoteId} onClose={closeNoteEdit} />}
       {stripTableId && !settingsTableId && (
         <TableColorStrip tableId={stripTableId} onKeep={stripKeep} onRelease={stripRelease} onOpenSettings={handleOpenSettings} />
       )}
