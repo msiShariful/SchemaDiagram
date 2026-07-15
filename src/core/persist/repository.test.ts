@@ -87,7 +87,7 @@ describe('snapshots', () => {
     // Simulate another tab that still holds a v1 connection open when this
     // tab's repository tries to open at v2 — without a `blocked` handler,
     // openDB(name, 2) never fires success OR error, it just hangs forever.
-    const v1 = await openDB('dbdraft', 1, {
+    const v1 = await openDB('schemadiagram', 1, {
       upgrade(d) { d.createObjectStore('diagrams', { keyPath: 'id' }); },
     });
     try {
@@ -99,7 +99,7 @@ describe('snapshots', () => {
 
   it('upgrades a v1 database in place, preserving diagrams', async () => {
     // Recreate the exact Plan-1 schema: version 1, diagrams store only.
-    const v1 = await openDB('dbdraft', 1, {
+    const v1 = await openDB('schemadiagram', 1, {
       upgrade(d) { d.createObjectStore('diagrams', { keyPath: 'id' }); },
     });
     await v1.put('diagrams', rec('legacy', 42));

@@ -80,7 +80,7 @@ test('visibility: eye toggle hides table + edges, persists across reload, All re
         page.evaluate(
           () =>
             new Promise<string>((resolve) => {
-              const req = indexedDB.open('dbdraft');
+              const req = indexedDB.open('schemadiagram');
               req.onsuccess = () => {
                 const db = req.result;
                 const all = db.transaction('diagrams').objectStore('diagrams').getAll();

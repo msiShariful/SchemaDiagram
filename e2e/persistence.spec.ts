@@ -58,7 +58,7 @@ test('reload restores text, dragged position and diagram', async ({ page }) => {
         page.evaluate(
           () =>
             new Promise<string>((resolve) => {
-              const req = indexedDB.open('dbdraft');
+              const req = indexedDB.open('schemadiagram');
               req.onsuccess = () => {
                 const db = req.result;
                 const all = db.transaction('diagrams').objectStore('diagrams').getAll();
@@ -89,7 +89,7 @@ test('snapshot restore round-trips non-destructively', async ({ page }) => {
     page.evaluate(
       () =>
         new Promise<number>((resolve) => {
-          const req = indexedDB.open('dbdraft');
+          const req = indexedDB.open('schemadiagram');
           req.onsuccess = () => {
             const db = req.result;
             const all = db.transaction('snapshots').objectStore('snapshots').getAll();
