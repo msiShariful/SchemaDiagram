@@ -72,7 +72,15 @@ export const TableNode = memo(function TableNode({
       onDoubleClick={() => onOpenInEditor(table.id)}
     >
       {lod === 'box' ? (
-        <rect width={TABLE_WIDTH} height={h} rx={6} className="table-box" fill={table.headerColor ?? undefined} />
+        <rect
+          width={TABLE_WIDTH}
+          height={h}
+          rx={6}
+          className="table-box"
+          // inline STYLE, not a fill attribute: the .table-box CSS rule wins
+          // over presentation attributes (cascade) — canvas AND exports
+          style={table.headerColor !== null ? { fill: table.headerColor } : undefined}
+        />
       ) : (
         <>
           <rect width={TABLE_WIDTH} height={h} rx={6} className="table-body" />
@@ -88,7 +96,14 @@ export const TableNode = memo(function TableNode({
               return (
                 <>
                   {tip !== null && <title>{tip}</title>}
-                  <rect width={TABLE_WIDTH} height={HEADER_HEIGHT} rx={6} className="table-header" fill={table.headerColor ?? undefined} />
+                  <rect
+                    width={TABLE_WIDTH}
+                    height={HEADER_HEIGHT}
+                    rx={6}
+                    className="table-header"
+                    // inline STYLE, not a fill attribute (cascade — see .table-box)
+                    style={table.headerColor !== null ? { fill: table.headerColor } : undefined}
+                  />
                   <text x={10} y={HEADER_HEIGHT / 2} dominantBaseline="central" className="table-title">
                     {fitTitle}
                   </text>

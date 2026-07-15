@@ -121,7 +121,11 @@ test('table settings popover writes headerColor into the DBML and repaints the h
 
   // The popover routed a TEXT edit through editorNav — the DBML changed…
   await expect(page.locator('.cm-content')).toContainText('Table users [headerColor: #e91e63]');
-  // …and the parse pipeline repainted the header fill (~300 ms debounce,
-  // absorbed by the retrying expect).
-  await expect(users.locator('.table-header')).toHaveAttribute('fill', '#e91e63');
+  // …and the parse pipeline repainted the header (~300 ms debounce, absorbed
+  // by the poll). COMPUTED fill, not the attribute: a stylesheet rule
+  // silently defeated the fill attribute for months while a toHaveAttribute
+  // assertion kept passing; the color now rides an inline style.
+  await expect
+    .poll(() => users.locator('.table-header').evaluate((el) => getComputedStyle(el).fill))
+    .toBe('rgb(233, 30, 99)'); // #e91e63
 });

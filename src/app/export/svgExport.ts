@@ -26,7 +26,10 @@ export interface BuiltSvg {
  *  Returns null when there is nothing to export (no canvas / nothing positioned). */
 export function buildDiagramSvg(): BuiltSvg | null {
   const live = document.querySelector('svg.diagram-canvas');
-  const scene = live?.firstElementChild ?? null; // the single scene <g>
+  // The scene is the svg's only direct <g> child — NOT firstElementChild:
+  // the dot-grid work put <defs> (and a grid <rect>) before it, which
+  // silently turned exports into background-only documents.
+  const scene = live?.querySelector(':scope > g') ?? null;
   // ponytail: the clone below carries whatever LOD the live canvas is
   // currently rendered at (TableNode collapses to `.table-box`, no field
   // text, below 15% zoom — see canvas/lod.ts). Forcing a full-detail

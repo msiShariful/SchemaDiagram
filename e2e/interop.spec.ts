@@ -83,7 +83,14 @@ test('every export format downloads (spec §10: "export each format")', async ({
 
   const svg = await exportItem('SVG (.svg)');
   expect(svg.suggestedFilename()).toBe('Untitled.svg');
-  expect(readFileSync(await svg.path(), 'utf8')).toContain('<svg');
+  const svgText = readFileSync(await svg.path(), 'utf8');
+  expect(svgText).toContain('<svg');
+  // CONTENT, not just an envelope: the dot-grid work once made exports
+  // clone <defs> instead of the scene — background-only files downloaded
+  // fine and this spec kept passing.
+  expect(svgText).toContain('class="table-header"');
+  expect(svgText).toContain('users');
+  expect(svgText).not.toContain('canvas-dot-grid'); // screen furniture stays out
 
   const png = await exportItem('PNG (2x)'); // binary: download event + filename only
   expect(png.suggestedFilename()).toBe('Untitled.png');
