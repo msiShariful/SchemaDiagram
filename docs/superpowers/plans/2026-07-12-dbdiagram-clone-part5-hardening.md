@@ -19,7 +19,7 @@
 - `tsconfig.json` `include` is `["src", "vite.config.ts"]`; `npm run build` = `tsc && vite build`.
 - Table `<g>` elements have class `table-node` (`.table-title` text = table name); edges are `g.edge`; the stale badge is `.badge.stale` with text "diagram out of date"; the status bar renders `.status-ok` / `.status-errors`; export/history/diagrams toolbar buttons are labeled `▼ export` / `▼ history` / `▼ diagrams`; the import dialog textarea is `.dialog-text` and its confirm button is "Import as new diagram"; History rows are `.history-panel li` with a "restore" button.
 - Starter diagram = 3 tables (`users`, `posts`, `comments`); a fresh browser context always boots into it. `placeNewTables` origin is (60, 60); `GRID_SIZE` is 16; alignment snap only triggers when other positioned tables exist, so a **single-table** document always pure-grid-snaps.
-- App theme: `App.tsx` stamps `document.documentElement.dataset.theme` in a `useEffect` from localStorage key `dbdraft.theme`; the theme toggle button's label is the *target* theme ("Dark" while light).
+- App theme: `App.tsx` stamps `document.documentElement.dataset.theme` in a `useEffect` from localStorage key `schemadiagram.theme`; the theme toggle button's label is the *target* theme ("Dark" while light).
 - `DiagramCanvas` pan currently requires `e.target === svgRef.current` (empty canvas only); `NoteNode` has no drag threshold; `MiniMap`'s `onPointerCancel` drops the scrub without committing.
 
 ## Global Constraints
@@ -880,7 +880,7 @@ npx vitest run && git add src/core/perf && git commit -m "feat: deterministic 12
 - `DiagramCanvas`: new `onPointerDownCapture` arms pan (Space+left / middle button) **before** any child's `onPointerDown` and stops propagation so a table/note/group drag never co-starts; `panRef`/`marqueeState` now carry the owning `pointerId`, and down/move/up ignore non-owning pointers and refuse to start a second gesture while one is active (the marquee/pan interleave ledger item — a second touch pointer or chorded press can neither hijack nor double-start).
 - `NoteNode`: 3 px drag threshold — parity with tables; a sub-threshold gesture is a click and commits nothing (previously every touch wrote a live transform and relied on the zero-delta prune).
 - `MiniMap`: `pointercancel` mid-scrub now commits the viewport like `pointerup` (ledger item: a cancelled scrub left the store viewport stale) — committing the **last scrubbed world center** kept in a ref by `navTo`, never the cancel event's own coordinates (a touch-cancel can deliver `clientX/Y` of (0,0), which would jump the viewport).
-- `index.html`: inline pre-React theme stamp from `localStorage['dbdraft.theme']`, try/caught (FOUC ledger item).
+- `index.html`: inline pre-React theme stamp from `localStorage['schemadiagram.theme']`, try/caught (FOUC ledger item).
 - All items are component/gesture wiring → **browser-verified** per repo convention (no unit tests by design); `snap.ts`'s change is a constant move with no behavior change.
 
 - [ ] **Step 1: Implement**
@@ -1123,14 +1123,14 @@ In `src/canvas/MiniMap.tsx` (three edits — `Point` is already imported there):
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DBDraft — database diagrams</title>
+    <title>SchemaDiagram — database diagrams</title>
     <script>
       // Pre-React theme stamp (FOUC guard): App.tsx re-reads the same key
-      // ('dbdraft.theme' — keep the two in sync) after mount; without this,
+      // ('schemadiagram.theme' — keep the two in sync) after mount; without this,
       // a stored dark preference paints one light frame first. Guarded:
       // localStorage can throw (private mode / blocked storage).
       try {
-        if (localStorage.getItem('dbdraft.theme') === 'dark') {
+        if (localStorage.getItem('schemadiagram.theme') === 'dark') {
           document.documentElement.dataset.theme = 'dark';
         }
       } catch (e) {
@@ -1147,7 +1147,7 @@ In `src/canvas/MiniMap.tsx` (three edits — `Point` is already imported there):
 
 In `src/app/App.tsx`, update the constant's line to document the coupling:
 ```ts
-const THEME_KEY = 'dbdraft.theme'; // keep in sync with the inline FOUC guard in index.html
+const THEME_KEY = 'schemadiagram.theme'; // keep in sync with the inline FOUC guard in index.html
 ```
 
 - [ ] **Step 2: Verify**
@@ -1485,7 +1485,7 @@ git add e2e/interop.spec.ts && git commit -m "feat: interop golden-flow e2e spec
 - Create: `e2e/persistence.spec.ts`
 
 **Interfaces:**
-- Consumes: `setEditorText`/`STARTER_TABLE_COUNT`, canvas undo (Ctrl/Cmd-Z on window), `GRID_SIZE = 16` snap behavior (single-table doc → no alignment candidates → pure grid snap, per Verified facts), IndexedDB `dbdraft` `diagrams` **and** `snapshots` stores (both polled directly — no arbitrary sleeps), History panel (rows `.history-panel li`, "restore" buttons, newest first), the Task 5 FOUC inline script, `data-theme` on `<html>`.
+- Consumes: `setEditorText`/`STARTER_TABLE_COUNT`, canvas undo (Ctrl/Cmd-Z on window), `GRID_SIZE = 16` snap behavior (single-table doc → no alignment candidates → pure grid snap, per Verified facts), IndexedDB `schemadiagram` `diagrams` **and** `snapshots` stores (both polled directly — no arbitrary sleeps), History panel (rows `.history-panel li`, "restore" buttons, newest first), the Task 5 FOUC inline script, `data-theme` on `<html>`.
 - Snapshot-timing gotcha this spec must respect: the bootstrap `putDiagram` writes **no** snapshot; the starter snapshot only lands when the 1 s autosave fires — and `scheduleAutosave` clears + re-arms on every state change, so an edit made too early cancels the starter save and only ONE snapshot ever exists. The restore test therefore polls the `snapshots` store to 1 **before** editing, then to 2 after.
 
 - [ ] **Step 1: Implement the spec**
@@ -1552,7 +1552,7 @@ test('reload restores text, dragged position and diagram', async ({ page }) => {
         page.evaluate(
           () =>
             new Promise<string>((resolve) => {
-              const req = indexedDB.open('dbdraft');
+              const req = indexedDB.open('schemadiagram');
               req.onsuccess = () => {
                 const db = req.result;
                 const all = db.transaction('diagrams').objectStore('diagrams').getAll();
@@ -1583,7 +1583,7 @@ test('snapshot restore round-trips non-destructively', async ({ page }) => {
     page.evaluate(
       () =>
         new Promise<number>((resolve) => {
-          const req = indexedDB.open('dbdraft');
+          const req = indexedDB.open('schemadiagram');
           req.onsuccess = () => {
             const db = req.result;
             const all = db.transaction('snapshots').objectStore('snapshots').getAll();

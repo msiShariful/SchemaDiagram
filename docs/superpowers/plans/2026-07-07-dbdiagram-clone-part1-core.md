@@ -63,7 +63,7 @@ dist
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DBDraft — database diagrams</title>
+    <title>SchemaDiagram — database diagrams</title>
   </head>
   <body>
     <div id="root"></div>
@@ -128,7 +128,7 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="toolbar">
-        <span className="brand">DBDraft</span>
+        <span className="brand">SchemaDiagram</span>
       </header>
       <main className="workspace">
         <section className="editor-pane">editor</section>
@@ -181,7 +181,7 @@ npm install -D typescript vite @vitejs/plugin-react vitest fake-indexeddb @types
 
 Run: `npm run build` — Expected: succeeds, `dist/` created.
 Run: `npm test` — Expected: exits 0 with "No test files found" (passWithNoTests).
-Run: `npm run dev` briefly — Expected: page shows toolbar "DBDraft" + two panes.
+Run: `npm run dev` briefly — Expected: page shows toolbar "SchemaDiagram" + two panes.
 
 - [ ] **Step 4: Commit**
 
@@ -1910,7 +1910,7 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="toolbar">
-        <span className="brand">DBDraft</span>
+        <span className="brand">SchemaDiagram</span>
         {stale && <span className="badge stale">diagram out of date</span>}
       </header>
       <main className="workspace">
@@ -2179,7 +2179,7 @@ export interface PersistedDiagram {
   updatedAt: number;
 }
 
-const DB_NAME = 'dbdraft';
+const DB_NAME = 'schemadiagram';
 const STORE = 'diagrams';
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -2556,7 +2556,7 @@ git add -A && git commit -m "feat: persistence bootstrap, autosave, diagram mana
 - Consumes: geometry (Task 2), `useAppStore` (Task 6), `clampZoom` (Task 10).
 - Produces:
   - `fitViewport(rects: Rect[], viewW: number, viewH: number, padding?: number): Viewport` (pure, tested).
-  - `<SplitPane left right />` — draggable divider, ratio persisted to `localStorage` key `dbdraft.split`.
+  - `<SplitPane left right />` — draggable divider, ratio persisted to `localStorage` key `schemadiagram.split`.
   - Zoom control cluster on the canvas (`+`, `−`, `fit`, percentage readout).
 
 - [ ] **Step 1: Write the failing test**
@@ -2619,7 +2619,7 @@ export function fitViewport(rects: Rect[], viewW: number, viewH: number, padding
 ```tsx
 import { useRef, type ReactNode } from 'react';
 
-const KEY = 'dbdraft.split';
+const KEY = 'schemadiagram.split';
 
 export function SplitPane({ left, right }: { left: ReactNode; right: ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null);

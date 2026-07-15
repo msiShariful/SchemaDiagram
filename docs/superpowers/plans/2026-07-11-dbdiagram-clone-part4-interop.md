@@ -4,7 +4,7 @@
 
 **Goal:** SQL import/export for PostgreSQL, MySQL and SQL Server, open/paste `.dbml`, PNG (2x) / SVG / project-file export, a per-diagram snapshot ring buffer with a History panel, and a working "download your work" escape hatch in the storage-unavailable banner — milestone 5 (spec §11.5, §3 Import/Export/Persistence rows, §8, §9).
 
-**Architecture:** Conversion is a pure facade in `src/core/convert/` that lazy-loads the already-installed `@dbml/core` (so the ~2.7 MB parser chunk never enters the main bundle); snapshots are a second object store in the existing `dbdraft` IndexedDB (version bump 1 → 2) owned by `src/core/persist/repository.ts`. Everything that touches the DOM — blob downloads, SVG scene serialization, canvas rasterization — lives in `src/app/export/`, with its pure sub-parts (bounds union, `var()` resolution, filename sanitizing) factored out and unit-tested in node. Import always creates a **new** diagram through the same flush-then-invalidate autosave discipline `createDiagram` uses.
+**Architecture:** Conversion is a pure facade in `src/core/convert/` that lazy-loads the already-installed `@dbml/core` (so the ~2.7 MB parser chunk never enters the main bundle); snapshots are a second object store in the existing `schemadiagram` IndexedDB (version bump 1 → 2) owned by `src/core/persist/repository.ts`. Everything that touches the DOM — blob downloads, SVG scene serialization, canvas rasterization — lives in `src/app/export/`, with its pure sub-parts (bounds union, `var()` resolution, filename sanitizing) factored out and unit-tested in node. Import always creates a **new** diagram through the same flush-then-invalidate autosave discipline `createDiagram` uses.
 
 **Tech Stack:** Existing Plan 1–2 stack only. `@dbml/core` `^8.3.1` (lockfile-pinned to 8.3.1), `idb`, `nanoid`, plus platform APIs (`Blob`, `URL.createObjectURL`, `XMLSerializer`, `<canvas>.toBlob`). **No new dependencies.**
 
@@ -700,7 +700,7 @@ git add src/core/model/geometry.ts src/core/model/geometry.test.ts src/app/expor
   - `putSnapshot(snap: DiagramSnapshot): Promise<void>` — insert + prune the ring to the newest `SNAPSHOT_LIMIT` rows for that diagram.
   - `listSnapshots(diagramId: string): Promise<DiagramSnapshot[]>` — newest first.
   - `deleteDiagram(id)` now also deletes that diagram's snapshots (history is per-diagram; no orphans).
-- Storage schema: DB `dbdraft` **version 2**. `diagrams` store unchanged. New store `snapshots` (`keyPath: 'id'`) with index `byDiagram` on `diagramId`. Upgrade path is per-version guarded: fresh installs run 0→2 (both stores), existing Plan-1 databases run 1→2 (snapshots store only, diagrams preserved in place).
+- Storage schema: DB `schemadiagram` **version 2**. `diagrams` store unchanged. New store `snapshots` (`keyPath: 'id'`) with index `byDiagram` on `diagramId`. Upgrade path is per-version guarded: fresh installs run 0→2 (both stores), existing Plan-1 databases run 1→2 (snapshots store only, diagrams preserved in place).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -752,7 +752,7 @@ describe('snapshots', () => {
 
   it('upgrades a v1 database in place, preserving diagrams', async () => {
     // Recreate the exact Plan-1 schema: version 1, diagrams store only.
-    const v1 = await openDB('dbdraft', 1, {
+    const v1 = await openDB('schemadiagram', 1, {
       upgrade(d) { d.createObjectStore('diagrams', { keyPath: 'id' }); },
     });
     await v1.put('diagrams', rec('legacy', 42));
@@ -798,7 +798,7 @@ export interface DiagramSnapshot {
 
 export const SNAPSHOT_LIMIT = 20;
 
-const DB_NAME = 'dbdraft';
+const DB_NAME = 'schemadiagram';
 const DB_VERSION = 2; // v1: diagrams. v2: + snapshots (keyPath id, index byDiagram).
 const STORE = 'diagrams';
 const SNAPSHOTS = 'snapshots';

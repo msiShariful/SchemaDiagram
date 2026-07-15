@@ -3205,7 +3205,7 @@ test('group collapse: pill, hidden members/edges, persists across reload', async
         page.evaluate(
           () =>
             new Promise<string>((resolve) => {
-              const req = indexedDB.open('dbdraft');
+              const req = indexedDB.open('schemadiagram');
               req.onsuccess = () => {
                 const db = req.result;
                 const all = db.transaction('diagrams').objectStore('diagrams').getAll();

@@ -10,7 +10,7 @@
       // a stored dark preference paints one light frame first. Guarded:
       // localStorage can throw (private mode / blocked storage).
       try {
-        if ((localStorage.getItem('schemadiagram.theme') ?? localStorage.getItem('dbdraft.theme')) === 'dark') {
+        if (localStorage.getItem('schemadiagram.theme') === 'dark') {
           document.documentElement.dataset.theme = 'dark';
         }
       } catch (e) {

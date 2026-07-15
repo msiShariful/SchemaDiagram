@@ -3339,7 +3339,7 @@ CSS-variable based: every hardcoded color in `styles.css` moves into `:root` var
 - Modify: `src/styles.css`, `src/app/App.tsx`, `src/editor/DbmlEditor.tsx`, `package.json`
 
 **Interfaces:**
-- Produces: `<html data-theme="dark">` toggles the palette; toolbar button flips + persists (`dbdraft.theme`); all canvas/editor/panel colors respond. No store involvement — no component needs the theme as data, CSS variables carry it everywhere.
+- Produces: `<html data-theme="dark">` toggles the palette; toolbar button flips + persists (`schemadiagram.theme`); all canvas/editor/panel colors respond. No store involvement — no component needs the theme as data, CSS variables carry it everywhere.
 
 - [ ] **Step 1: Implement `src/styles.css`**
 
@@ -3455,7 +3455,7 @@ Add above the component (same guarded pattern as `SplitPane.readSplit`/`writeSpl
 ```tsx
 import { useEffect, useState } from 'react';
 
-const THEME_KEY = 'dbdraft.theme';
+const THEME_KEY = 'schemadiagram.theme';
 type Theme = 'light' | 'dark';
 
 // Best-effort persistence — the app must never break because localStorage
