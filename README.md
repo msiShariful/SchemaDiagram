@@ -11,6 +11,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)
 ![No backend](https://img.shields.io/badge/backend-none-success)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <img src="docs/screenshot.png" alt="SchemaDiagram — DBML editor with live ER diagram" width="100%" />
 
@@ -102,7 +103,7 @@ npm run build         # strict typecheck + production build
 
 ## 📄 License
 
-Currently unlicensed — all rights reserved. Open an issue if you'd like to use this project.
+[MIT](LICENSE) — free to use, modify, and distribute.
 
 ---
 
